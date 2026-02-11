@@ -65,6 +65,7 @@ sequenceDiagram
         opt is RentBook
             create participant RB as RentBook
             SYS ->> RB: create(rental_date,due_date)
+            RB -->> SYS: return RentBook object [object]
             create participant PS as Payment
             SYS ->> PS: create(order)
             PS -->> SYS: return payment object [object]
