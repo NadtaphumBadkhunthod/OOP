@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import RedirectResponse
-from datetime import datetime
+from datetime import datetime, date
+from enum import Enum
 import uvicorn
 
 app = FastAPI()
 
-class System :
+class System:
     def __init__(self):
         self.__staff_list = []
         self.__promotion_list = []
@@ -24,10 +25,10 @@ class System :
         :param email: email of customer
         """
 
-        if (not self.validate_input_data()):
+        if (not self.validate_input_data(name,surname,phonenumber,email)):
             raise ValueError()
         
-        if (self.check_duplicate_account):
+        if (self.check_duplicate_account(phonenumber)):
             raise IndexError()
         
         member = Member(name,surname,phonenumber,email)
@@ -35,8 +36,21 @@ class System :
 
         return member
     
-    def delete_member(self,member):
-        self.__customer_list.remove(member)
+    def add_customer(self,customer):
+        if isinstance(customer,Customer):
+            if (not self.validate_input_data(customer.name,customer.surname,customer.phonenumber,customer.email)):
+                raise ValueError()
+            
+            if (self.check_duplicate_account(customer.phonenumber)):
+                raise IndexError()
+            self.__customer_list.append(customer)
+
+    def delete_customer(self,customer):
+        if isinstance(customer,Customer):
+            self.__customer_list.remove(customer)
+
+    def get_customer_list(self):
+        return self.__customer_list
 
     def check_duplicate_account(self,phonenumber):
         """
@@ -106,8 +120,8 @@ class System :
         if not clean_digits.isdigit():
             raise ValueError("Phone number contains invalid characters.")
 
-        if len(clean_digits) == 10:
-            raise ValueError("Phone number length is invalid (should be 10 digits).")
+        if len(clean_digits) != 10:
+            raise ValueError(f"Phone number length is invalid (should be 10 digits). {len(clean_digits)}")
         
 
         return True
@@ -124,6 +138,7 @@ class System :
             for bookstock in self.__book_stock:
                 if bookstock.name == bookname:
                     return bookstock.search_book_avaliable(activity_type)
+            return "Not Found"
                 
     def search_area(self,customer,area_id):
         if not customer.check_eligibility():
@@ -164,6 +179,7 @@ class System :
                         print("change status successful") 
                         return
 
+        self.__transaction_list.append(transaction)
         customer.add_transaction(transaction)
 
         self.notify_user(customer,f"{customer.name}: transaction ... confirm") #need implement : ต้องเปลี่ยนคำ
@@ -282,7 +298,7 @@ class RentBook:
         pass
             
 class Customer:
-    def __init__(self,name:str,surname:str,phonenumber:int,email:str):
+    def __init__(self,name:str,surname:str,phonenumber:str,email:str):
         """
         Docstring for __init__
         
@@ -305,7 +321,19 @@ class Customer:
 
     @property
     def name(self):
-        return self.name
+        return self.__name
+    
+    @property
+    def surname(self):
+        return self.__surname
+    
+    @property
+    def phonenumber(self):
+        return self.__phonenumber
+    
+    @property
+    def email(self):
+        return self.__email
 
     def check_eligibility(self):
         return self.__strike < 3
@@ -336,14 +364,36 @@ class Member(Customer):
         self.__level_member = "Silver"
         self.__birth_month = birth_month
         self.__points = 0
-        self.__booking_book_quota = 0
+        self.__booking_book_quota = 6 # silver 6 gold 8 platinum 10
+        try:
+            self.__expiration_date = date.today().replace(year=date.today().year + 1)
+        except:
+            self.__expiration_date = date.today().replace(year=date.today().year + 1,month=3, day=1)
+    
+    def add_point(self):
+        self.__points += 1
 
-class Staff:
-    def __init__(self):
-        pass
+class Staff(Member):
+    count = 0
+    def __init__(self, name, surname, phonenumber, email, birth_month,no_branch):
+        super().__init__(name, surname, phonenumber, email, birth_month)
+        self.__no_staff = f"STF-{Staff.count}"
+        self.__no_branch = no_branch
+    
+    def process_return(self,book,customer):
+        if not isinstance(book,Book):
+            raise ValueError("Not a book")
+        
+        if not isinstance(customer,Customer):
+            raise ValueError("Not a customer")
+        
+        # Need implement
 
-class Manager:
-    def __init__(self):
+class Manager(Staff):
+    def __init__(self, name, surname, phonenumber, email, birth_month, no_branch):
+        super().__init__(name, surname, phonenumber, email, birth_month, no_branch)
+    
+    def print_report(self):
         pass
 
 class BookStock:
@@ -422,18 +472,26 @@ class Book:
     def get_activity_type(self):
         return self.__activity_type
 
+Bibliohub = System()
+
 @app.get("/")
 def redirect_to_docs():
     return RedirectResponse(url="/docs")
 
-@app.get("/get_customer_information")
-def get_customer_information(name:str = Query(description="ชื่อจริงลูกค้า"),surname:str = Query(description="นามสกุลลูกค้า"),phonenumber:int = Query(description="เบอร์โทรศัพทธ์ลูกค้า"),email:str = Query(description="อีเมลลูกค้า")):
-    Customer = Customer(name,surname,phonenumber,email)
-    return Customer
+@app.get("/create_customer")
+def create_customer(name:str = Query(description="ชื่อจริงลูกค้า"),surname:str = Query(description="นามสกุลลูกค้า"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์ลูกค้า"),email:str = Query(description="อีเมลลูกค้า")):
+    customer = Customer(name,surname,phonenumber,email)
+    Bibliohub.add_customer(customer)
+    return customer
 
-# @app.get("/test")
-# def read_root(request:str, reply:str):
-#     return {"Request":request, "Reply": reply}
+
+class ActivityType(str, Enum):
+    Rent = "Rent"
+    Purchase = "Purchase"
+
+@app.get("/search_book")
+def search_book(phonenumber:str, book_name:str,activity_type:ActivityType):
+    return Bibliohub.search_book(Bibliohub.get_user_from_phone_number(phonenumber),book_name,activity_type.value)
 
 # @app.get("/items/{item_id}/{q}")
 # def read_item(item_id: int, q: str | None = None):
