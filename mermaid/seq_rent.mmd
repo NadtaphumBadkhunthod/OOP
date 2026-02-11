@@ -42,26 +42,26 @@ sequenceDiagram
     end
 
     loop select action type
-        NMB ->> Book: change_activity_type
+        NMB ->> BK: change_activity_type
         
         opt rent action type
-            Book ->> NMB: check_quota()
-            NMB -->> Book: return quota status [bool]
+            BK ->> NMB: check_quota()
+            NMB -->> BK: return quota status [bool]
 
             opt due quota limit
-                Book -->> NMB: error due quota limit
+                BK -->> NMB: error due quota limit
             end
 
         end
 
 
-        Book -->> NMB: change_activity_type successful
+        BK -->> NMB: change_activity_type successful
     end
 
     NMB ->> SYS: checkout(select[List])
     loop all in select
-        SYS ->> Book: get_activity_type()
-        Book -->> SYS: return activity_type [String]
+        SYS ->> BK: get_activity_type()
+        BK -->> SYS: return activity_type [String]
         opt is RentBook
             create participant RB as RentBook
             SYS ->> RB: create(rental_date,due_date)

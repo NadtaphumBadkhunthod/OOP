@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import RedirectResponse
+from datetime import datetime
 import uvicorn
 
 app = FastAPI()
@@ -163,9 +164,14 @@ class System :
                         print("change status successful") 
                         return
 
-        customer.add_transaction()
+        customer.add_transaction(transaction)
 
-        self.notify_user(customer,"transaction ... confirm") #need implement : ต้องเปลี่ยนคำ
+        self.notify_user(customer,f"{customer.name}: transaction ... confirm") #need implement : ต้องเปลี่ยนคำ
+
+        if isinstance(customer,Member):
+            customer.add_point()
+
+        self.notify_user(customer,f"{customer.name}: add point successful")
 
         return "ทำรายการเสร็จสิ้น"
     
@@ -224,28 +230,36 @@ class System :
         pass        
 
 class Notification:
-    def __init__(self):
-        pass
+    count = 0
+    def __init__(self,customer,message):
+        self.__customer = customer
+        self.__message = message
+        self.__uid = f"NT-{customer.name}-{Notification.count}"
 
 class Area:
     def __init__(self):
         pass
 
 class Promotion:
-    def __init__(self):
-        pass
-
-class Staff:
-    def __init__(self):
-        pass
-
-class BookStock:
-    def __init__(self):
-        pass
-
-class Manager:
-    def __init__(self):
-        pass
+    def __init__(self,promo_code,discount_rate):
+        self.__promo_code = promo_code
+        self.__discount_rate = discount_rate
+        self.__status = False
+        self.__used_user = []
+        
+    def is_eligible(self,customer):
+        if isinstance(customer,Customer):
+            return customer not in self.__used_user
+        
+    def apply_discount(self,price,customer):
+        if isinstance(customer,Customer):
+            if self.is_eligible(customer):
+                self.__used_user.append(customer)
+                return price - (price * self.__discount_rate)
+            
+    def payment_unsuccess(self,customer):
+        if isinstance(customer,Customer):
+            self.__used_user.remove(customer)
 
 class BirthDate:
     def __init__(self):
@@ -262,18 +276,6 @@ class Payment:
 class Purchase:
     def __init__(self):
         pass                    
-
-class RentBook:
-    def __init__(self):
-        pass
-
-class Book:
-    def __init__(self):
-        pass
-
-class Member:
-    def __init__(self):
-        pass
 
 class RentBook:
     def __init__(self):
@@ -301,6 +303,124 @@ class Customer:
         self.__strike = 0
         self.__selected_list = []
 
+    @property
+    def name(self):
+        return self.name
+
+    def check_eligibility(self):
+        return self.__strike < 3
+    
+    def check_quota(self): 
+        return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.activity_type == "Rent"]) < 4
+
+    def select(self,order):
+        if isinstance(order,Purchase):
+            self.__selected_list.append(order)
+
+    def unselect(self,order):
+        if isinstance(order,Purchase):
+            self.__selected_list.remove(order)
+
+    def add_notify(self,notification):
+        if isinstance(notification,Notification):
+            self.__notification_list.append(notification)
+
+    def add_transaction(self,transaction):
+        if isinstance(transaction,Transaction):
+            self.__transaction.append(transaction)
+
+class Member(Customer):
+    def __init__(self, name, surname, phonenumber, email, birth_month):
+        super().__init__(name, surname, phonenumber, email)
+
+        self.__level_member = "Silver"
+        self.__birth_month = birth_month
+        self.__points = 0
+        self.__booking_book_quota = 0
+
+class Staff:
+    def __init__(self):
+        pass
+
+class Manager:
+    def __init__(self):
+        pass
+
+class BookStock:
+    def __init__(self,name):
+        self.__name = name
+        self.__forsale_book_list = []
+        self.__rent_book_list = []
+
+    def add_book(self,book):
+        if isinstance(book,Book):
+            if book.activity_type == "Rent":
+                self.__rent_book_list.append(book)
+            elif book.activity_type == "Purchase":
+                self.__forsale_book_list.append(book)
+            else:
+                raise TypeError("Activity type error")
+        else:
+            raise TypeError("Need to be a book")
+        
+    def remove_book(self,book):
+        if isinstance(book,Book):
+            if book.activity_type == "Rent":
+                self.__rent_book_list.remove(book)
+            elif book.activity_type == "Purchase":
+                self.__forsale_book_list.remove(book)
+            else:
+                raise TypeError("Activity type error")
+        else:
+            raise TypeError("Need to be a book")
+        
+    def search_book_available(self,BookName,activity_type):
+        if activity_type == "Rent":
+            for book in self.__rent_book_list:
+                if book.book_name == BookName:
+                    if book.checkavailability():
+                        return book
+        elif activity_type == "Purchase":
+            for book in self.__forsale_book_list:
+                if book.book_name == BookName:
+                    if book.checkavailability():
+                        return book
+        else:
+            raise TypeError("Activity type error")
+        
+class Book:
+    count = 0
+
+    def __init__(self,name,series,author,category,price,activity_type,available_date=datetime.now()):
+        self.__book_name = name
+        self.__book_series = series
+        self.__book_uid = f"BK-{activity_type}-{series}-{name}-{author}-{Book.count}"
+        self.__author = author
+        self.__category = category
+        self.__price = price
+        self.__activity_type = activity_type
+        self.__borrowed_count = 0
+        if available_date == datetime.now():
+            self.__book_status = "Available"
+        else:
+            self.__book_status = "Incoming"
+        self.__available_date = available_date
+        Book.count += 1
+
+    def check_available(self):
+        return self.__book_status == "Available"
+    
+    def change_status(self,status):
+        self.__book_status = status
+
+    def get_rate_info(self):
+        return self.__price
+    
+    def change_activity_type(self,activity_type):
+        self.__activity_type = activity_type
+
+    def get_activity_type(self):
+        return self.__activity_type
 
 @app.get("/")
 def redirect_to_docs():
