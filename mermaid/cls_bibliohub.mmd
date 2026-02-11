@@ -96,7 +96,7 @@ direction TB
     }
 
     class Transaction {
-	    -NonMember user "ผู้ทำรายการ"
+	    -Customer user "ผู้ทำรายการ"
 	    -Staff staff "staff_obj"
 	    -DateTime start_date_time "วันที่เริ่มรายการ"
 	    -DateTime end_date_time "กำหนดการสิ้นสุด"
@@ -138,7 +138,7 @@ direction TB
     }
 
     class Payment {
-		-NonMember customer "ผู้ทำรายการ"
+		-Customer customer "ผู้ทำรายการ"
 	    -String payment_no "เลขสลีปปื้ง"
 	    -String status"Unpaid, Paid, Voided"
 	    -List order "เก็บก้อน BookingCafe/BookingBook/RentBook/Purchase"
@@ -164,12 +164,12 @@ direction TB
 
     class Notification {
 	    -String message
-	    -NonMember target_user
+	    -Customer target_user
 	    -String notification_id
 	    +send_message() "send_expiry_alert(transaction, lead_time) "
     }
 
-    class NonMember {
+    class Customer {
 	    -String name
 	    -String surname
 	    -Int phonenumber
@@ -213,7 +213,6 @@ direction TB
 	    +search_book()
 	    +search_area()
 	    +checkout()
-	    +create_transaction()
 	    +verify_permission()
 	    +add_book_stock()
 	    +add_staff()
@@ -221,7 +220,7 @@ direction TB
 	    +add_area()
 	    +remove_area()
 	    +add_strike()
-	    +remove_strike()
+	    +reduce_strike()
 	    +notify_user()
 	    +upgrade_booking_area() "อัพเกรดarea"
 	    +generate_utilization_report()
@@ -233,13 +232,13 @@ direction TB
     BiblioHubSystem "0..*" <-- "1" BookingArea
     BiblioHubSystem "1" o-- "1..*" Staff
     BiblioHubSystem "1" o-- "1..*" Area
-    BiblioHubSystem "1" o-- "0..*" NonMember
+    BiblioHubSystem "1" o-- "0..*" Customer
     BiblioHubSystem "1" o-- "0..*" Transaction
     BiblioHubSystem "1" o-- "0..*" BirthDate
     BiblioHubSystem "1" o-- "0..*" DoubleDate
     BiblioHubSystem "1" o-- "1..*" BookStock
     BiblioHubSystem "1" o-- "0..*" Notification
-    NonMember <|-- Member
+    Customer <|-- Member
     Member <|-- Staff
     Staff <|-- Manager
     Purchase <|-- RentBook
@@ -252,7 +251,7 @@ direction TB
     RentBook "1" --> "0..*" Book
     Purchase "1" --> "0..*" Book
     Purchase "0.." --o "1" Payment
-    Transaction "0..*" <--> "1" NonMember
+    Transaction "0..*" <--> "1" Customer
     Book --> TypeBook
     BookStock "1" o-- "0..*" Book
     Area "1" o-- "0..*" TimeSlot
@@ -262,4 +261,4 @@ direction TB
     Cash --|> PaymentMethod
     DoubleDate --|> Promotion
     BirthDate --|> Promotion
-    Notification "0..*" --o "1" NonMember
+    Notification "0..*" --o "1" Customer
