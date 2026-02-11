@@ -1,0 +1,71 @@
+sequenceDiagram
+    autonumber
+    actor Customer as Member / NonMember
+    participant System as BiblioHubSystem
+    participant AreaObj as Area
+    
+    participant Slot as TimeSlot
+    
+    participant PayObj as Payment
+    
+
+    Customer->>System: search_area()
+    System->>AreaObj: list_timeslot()
+    
+    loop  TimeSlot ใน Area นั้น
+        AreaObj->>Slot: check is_available
+        Slot-->>AreaObj: return status
+    end
+    
+    AreaObj-->>System: return available_slots
+    System-->>Customer: show available areas & slots
+
+    System->>Customer: check_eligibility()
+    Customer-->>System: return ประวัติดี
+
+    Customer->>System: select_area()
+    System-->>Customer: return Select Sucess
+    System->>Customer: check_quota()
+    Customer-->>System: return quota
+    System->>System:validate_booking_conflict()
+    Customer->>System: checkout()
+    create participant BArea as BookingArea
+    System->>BArea:create_booking_area()
+    BArea -->>System:return booking_area_obj
+    opt เข้าเงื่อนไข Promotion (เช่น วันเกิด/Double Date)
+        System->>System: apply_discount(Promotion)
+    end
+    
+    alt สิทธิ์ผ่าน และ พื้นที่ว่าง (Success Case)
+        System->>PayObj: calculate_net_amount()
+        PayObj-->>System: return net_amount
+        System->>PayObj: process_payment()
+        PayObj-->>System: return payment_confirmed
+
+        create participant Transac as Transaction
+        System->>Transac: create_transaction()
+        Transac-->>System:return Create Success
+        System->>Transac: add_audit_log()
+        Transac-->>System: return Success
+        System->>Transac: update_status("Confirmed")
+        Transac-->>System:return Update Success
+        
+        
+        loop ทุกๆ Slot ที่จอง (รวมที่อัปเกรดแล้ว)
+            System->>Slot: update_slot(is_available=False)
+            Slot-->>System: return Update Success
+        end
+        System->>Customer:add_transaction()
+        Customer-->>System:return add_success
+        System->>System:notify_user()
+        create participant Notify as Notification
+        System->>Notify: create_notify()
+        Notify-->>System: return notify obj
+        System->>Notify: send_message("Booking Success")
+        Notify-->>System: return send Success
+        System->>Customer:add_notify()
+        Customer-->>System: return add success
+        System-->>Customer: return เสร็จสิ้นการทำรายการ
+    else สิทธิ์ไม่ผ่าน หรือ มีการจองซ้อน (Failure Case)
+        System-->>Customer: notify_error("Booking Failed")
+    end

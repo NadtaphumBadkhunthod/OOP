@@ -1,0 +1,114 @@
+sequenceDiagram
+    autonumber
+    actor NMB as NonMember
+    actor MB as Member
+    participant SYS as BiblioHubSystem
+    participant BS as BookStock
+    participant BK as Book
+
+    loop Select Book 
+        NMB ->> SYS: search_book(customer,"Name Book",activity_type)
+
+        SYS ->> NMB: check_eligibility()
+        NMB -->> SYS: return eligibility status [bool]
+
+        alt eligibility
+            SYS ->> BS: search_book_avaliable(BookName,activity_type)
+            BS ->> BK: check_availability()
+            BK -->> BS: return availability[bool]
+            BS -->> SYS: return book[object]
+            
+
+            alt Book Available
+                SYS -->> NMB: return book[object]
+
+                opt want that book
+                    NMB ->> NMB: select(book[object])
+                    NMB ->> BK: change_status("Selected")
+                end
+
+                opt already have book and don't want that book
+                    NMB ->> NMB: unselect(book[object])
+                    NMB ->> BK: change_status("Available")
+                end
+            else
+                SYS -->> NMB: return No Book Available
+            end
+
+        else
+            SYS --> NMB: return you not able to rent
+        end
+
+    end
+
+    loop select action type
+        NMB ->> Book: change_activity_type
+        
+        opt rent action type
+            Book ->> NMB: check_quota()
+            NMB -->> Book: return quota status [bool]
+
+            opt due quota limit
+                Book -->> NMB: error due quota limit
+            end
+
+        end
+
+
+        Book -->> NMB: change_activity_type successful
+    end
+
+    NMB ->> SYS: checkout(select[List])
+    loop all in select
+        SYS ->> Book: get_activity_type()
+        Book -->> SYS: return activity_type [String]
+        opt is RentBook
+            create participant RB as RentBook
+            SYS ->> RB: create(rental_date,due_date)
+            create participant PS as Payment
+            SYS ->> PS: create(order)
+            PS -->> SYS: return payment object [object]
+
+            create participant TS as Transaction
+            SYS ->> TS: create(user,staff,start_date_time,end_date_time,status,payment)
+            TS -->> SYS: return transaction object [object]
+
+        end
+        
+    end
+
+    SYS ->> PS: payment_method()
+    PS -->> SYS: return successful
+
+    alt Payment successful
+        SYS ->> TS: update_status()
+        TS -->> SYS: return successful
+
+        loop All Book
+            SYS ->> BK: change_status("Not Available")
+            BK -->> SYS: change_status successful
+        end
+
+        SYS ->> SYS: notify_user()
+        create participant Notify as Notification
+        SYS ->> Notify: create(message,target_user)
+        Notify -->> SYS: return Notification [object]
+        SYS ->> Notify: send_message()
+        Notify -->> SYS: return Notification status [object]
+
+        SYS ->> NMB: add_transaction(Transaction[object])
+        NMB -->> SYS: return add_transaction status[bool]
+
+        SYS ->> NMB: add notify()
+        NMB -->> SYS: return notify successful
+
+        opt is Member
+            SYS ->> MB: add_point()
+        end
+        SYS -->> NMB: return checkout successful
+
+    else
+        SYS -->> NMB: return checkout unsuccessful
+    end
+
+
