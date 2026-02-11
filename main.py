@@ -146,16 +146,20 @@ class System :
                         return
                     case _: raise ValueError("Error : Activity type not found")
         
-        payment = Payment(list_order,payment_method)
+        payment = Payment(customer,list_order,payment_method)
         transaction = Transaction(customer,staff,"datetime.now",payment)
 
-        sub_total = transaction.payment.calculate_subtotal()
+        net_amount = payment.process_payment() #need implement : calculate payment ใน payment ไปเลย
+        transaction.add_audit_log() #need implement : เพิ่มรูปแบบของ audit log
+        transaction.update_status("Confirm")
 
-        discount = 0
-        if isinstance(customer,Member):
-            for promotion in self.__promotion_list:
-                if promotion.is_eligible():
-                    discount += promotion.apply_discount(sub_total)
+        # ส่วนท้ายการทำงาน need implement : ถ้ารายการไหนต้อง update status ของสินค้ามาทำในส่วนนี้
+    
+        customer.add_transaction()
+
+        self.notify_user(customer,"transaction ... confirm") #need implement : ต้องเปลี่ยนคำ
+
+        return "ทำรายการเสร็จสิ้น"
 
 class BirthDate:
     def __init__(self):

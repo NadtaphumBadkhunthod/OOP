@@ -1,7 +1,7 @@
 ---
 config:
   layout: elk
-  theme: redux
+  theme: redux_dark
 ---
 classDiagram
 direction TB
@@ -138,6 +138,7 @@ direction TB
     }
 
     class Payment {
+		-NonMember customer "ผู้ทำรายการ"
 	    -String payment_no "เลขสลีปปื้ง"
 	    -String status"Unpaid, Paid, Voided"
 	    -List order "เก็บก้อน BookingCafe/BookingBook/RentBook/Purchase"
