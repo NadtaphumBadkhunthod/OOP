@@ -1,0 +1,58 @@
+sequenceDiagram
+    autonumber
+    actor Customer as Customer / Member
+    participant System as BiblioHubSystem
+    participant Trans as Transaction (Existing)
+    participant BArea as BookingArea (History)
+    participant NewArea as Area (New Type)
+    participant Slot as TimeSlot
+    
+    participant Notify as Notification
+
+    Note over Customer, Trans: ลูกค้านั่งใช้งานอยู่ในระบบแล้ว (Active Transaction)
+
+    Customer->>System: upgrade_booking_area(new_type)
+    System->>System: search_area(new_type)
+    System->>NewArea: list_timeslot()
+    
+    alt ไม่มีพื้นที่ว่างในประเภทที่ต้องการ
+        System-->>Customer: notify_error("No available slots for this type")
+    else พบพื้นที่ว่าง
+		NewArea-->>System: return empty area
+        System->>BArea: calculate_upgrade_delta(new_area)
+        Note right of BArea: คำนวณส่วนต่างจากเวลาที่เหลือ <br/> และส่วนต่าง hourly_rate
+        BArea-->>System: return upgrade_delta
+        
+        System-->>Customer: show_upgrade_fee(upgrade_delta)
+        
+        Customer->>System: checkout()เพื่อคอนเฟิร์มที่จะอัพเกรดที่นั่ง
+        create participant Pay as Payment (Upgrade Invoice)
+        System->>Pay: create_payment(upgrade_delta)
+		Pay-->>System: return create success
+        System->>Pay: process_payment()
+        Pay-->>System: return payment_confirmed
+
+        System->>BArea: update_reserved_slots(new_slots)
+        
+        loop Release & Occupy
+            System->>Slot: update_slot(old_slot, is_available=True)
+            System->>Slot: update_slot(new_slot, is_available=False)
+        end
+		Slot-->>System :return updeate success
+        System->>Trans: add_audit_log("Upgraded to " + new_type)
+		Trans-->>System: return add success
+        System->>Trans: sync_payment_with_activity()
+		Trans-->>System: return Adjustment successful.
+        
+        System->>System:notify_user()
+        create participant Notify as Notification
+        System->>Notify: create_notify()
+        Notify-->>System: return notify obj
+        System->>Notify: send_message("Booking Success")
+        Notify-->>System: return send Success
+        System->>Customer:add_notify()
+        Customer-->>System: return add success
+        System-->>Customer: return เสร็จสิ้นการทำรายการ
+    else สิทธิ์ไม่ผ่าน หรือ มีการจองซ้อน (Failure Case)
+        System-->>Customer: notify_error("Booking Failed")
+    end
