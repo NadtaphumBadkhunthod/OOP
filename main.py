@@ -16,7 +16,7 @@ class System :
 
     def register(self,name,surname,phonenumber,email):
         """
-        Registering create member object by using nonmember data.
+        Registering create member object by using Customer data.
         :param name: name of customer
         :param surname: surname of customer
         :param phonenumber: phonenumber of customer
@@ -149,17 +149,103 @@ class System :
         payment = Payment(customer,list_order,payment_method)
         transaction = Transaction(customer,staff,"datetime.now",payment)
 
+        transaction.add_audit_log("request : datetime.now") #need implement : เพิ่มรูปแบบของ audit log
         net_amount = payment.process_payment() #need implement : calculate payment ใน payment ไปเลย
-        transaction.add_audit_log() #need implement : เพิ่มรูปแบบของ audit log
+        print(net_amount)
         transaction.update_status("Confirm")
 
         # ส่วนท้ายการทำงาน need implement : ถ้ารายการไหนต้อง update status ของสินค้ามาทำในส่วนนี้
-    
+        for item in list_order:
+            if isinstance(item,Book):
+                match item.get_activity_type():
+                    case "Rent":
+                        item.change_status("Not Available")
+                        print("change status successful") 
+                        return
+
         customer.add_transaction()
 
         self.notify_user(customer,"transaction ... confirm") #need implement : ต้องเปลี่ยนคำ
 
         return "ทำรายการเสร็จสิ้น"
+    
+    def verify_permission(self,manager):
+        return isinstance(manager,Manager)
+    
+    def add_book_stock(self,book_stock):
+        if isinstance(book_stock,BookStock):
+            self.__book_stock.append(book_stock)
+
+    def remove_book_stock(self,book_stock):
+        if isinstance(book_stock,BookStock):
+            self.__book_stock.remove(book_stock)
+
+    def add_staff(self,staff):
+        if isinstance(staff,Staff):
+            self.__staff_list.append(staff)
+
+    def remove_staff(self,staff):
+        if isinstance(staff,Staff):
+            self.__staff_list.remove(staff)
+
+    def add_promotion(self,promotion):
+        if isinstance(promotion,Promotion):
+            self.__promotion_list.append(promotion)
+
+    def remove_promotion(self,promotion):
+        if isinstance(promotion,Promotion):
+            self.__promotion_list.remove(promotion)
+    
+    def add_area(self,area):
+        if isinstance(area,Area):
+            self.__area.append(area)
+
+    def remove_area(self,area):
+        if isinstance(area,Area):
+            self.__area.remove(area) 
+    
+    def add_strike(self,customer):
+        if isinstance(customer,Customer):
+            customer.add_stike()
+
+    def reduce_strike(self,customer):
+        if isinstance(customer,Customer):
+            customer.reduce_strike()
+
+    def notify_user(self,customer,message):
+        if isinstance(customer,Customer):
+            if isinstance(message,str):
+                self.__notification_list.append(Notification(customer,message))
+
+    def upgrade_booking_area(self):
+        pass
+
+    def generate_utilization_report(self):
+        pass        
+
+class Notification:
+    def __init__(self):
+        pass
+
+class Area:
+    def __init__(self):
+        pass
+
+class Promotion:
+    def __init__(self):
+        pass
+
+class Staff:
+    def __init__(self):
+        pass
+
+class BookStock:
+    def __init__(self):
+        pass
+
+class Manager:
+    def __init__(self):
+        pass
 
 class BirthDate:
     def __init__(self):
@@ -193,7 +279,7 @@ class RentBook:
     def __init__(self):
         pass
             
-class NonMember:
+class Customer:
     def __init__(self,name:str,surname:str,phonenumber:int,email:str):
         """
         Docstring for __init__
@@ -222,7 +308,7 @@ def redirect_to_docs():
 
 @app.get("/get_customer_information")
 def get_customer_information(name:str = Query(description="ชื่อจริงลูกค้า"),surname:str = Query(description="นามสกุลลูกค้า"),phonenumber:int = Query(description="เบอร์โทรศัพทธ์ลูกค้า"),email:str = Query(description="อีเมลลูกค้า")):
-    Customer = NonMember(name,surname,phonenumber,email)
+    Customer = Customer(name,surname,phonenumber,email)
     return Customer
 
 # @app.get("/test")
