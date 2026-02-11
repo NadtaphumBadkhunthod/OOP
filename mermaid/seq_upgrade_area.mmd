@@ -6,9 +6,6 @@ sequenceDiagram
     participant BArea as BookingArea (History)
     participant NewArea as Area (New Type)
     participant Slot as TimeSlot
-    
-    participant Notify as Notification
-
     Note over Customer, Trans: ลูกค้านั่งใช้งานอยู่ในระบบแล้ว (Active Transaction)
 
     Customer->>System: upgrade_booking_area(new_type)
