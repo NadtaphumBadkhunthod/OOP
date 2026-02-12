@@ -199,13 +199,19 @@ class System:
             for book_stock in self.__book_stock:
                 if book_stock.name == book.series:
                     book_stock.add_book(book)
+                    return "Add Book Successful"
         
-        self.__book_stock.append(BookStock(book.series).add_book(book))
-        return "Add Book Successful"
+        book_stock = BookStock(book.series)
+        book_stock.add_book(book)
+        self.__book_stock.append(book_stock)
+        return "Create BookStock Successful"
 
     def remove_book(self,book_stock):
         if isinstance(book_stock,BookStock):
             self.__book_stock.remove(book_stock)
+
+    def get_all_book(self):
+        return self.__book_stock
 
     def add_staff(self,staff):
         if isinstance(staff,Staff):
@@ -407,11 +413,15 @@ class BookStock:
         self.__forsale_book_list = []
         self.__rent_book_list = []
 
+    @property
+    def name(self):
+        return self.__name
+
     def add_book(self,book):
         if isinstance(book,Book):
-            if book.activity_type == "Rent":
+            if book.get_activity_type == "Rent":
                 self.__rent_book_list.append(book)
-            elif book.activity_type == "Purchase":
+            elif book.get_activity_type == "Purchase":
                 self.__forsale_book_list.append(book)
             else:
                 raise TypeError("Activity type error")
@@ -446,7 +456,7 @@ class BookStock:
 class Book:
     count = 0
 
-    def __init__(self,name,series,author,category,price,activity_type,available_date=datetime.now()):
+    def __init__(self,name,series,author,category,price,activity_type,available_date=date.today()):
         self.__book_name = name
         self.__book_series = series
         self.__book_uid = f"BK-{activity_type}-{series}-{name}-{author}-{Book.count}"
@@ -455,12 +465,18 @@ class Book:
         self.__price = price
         self.__activity_type = activity_type
         self.__borrowed_count = 0
-        if available_date == datetime.now():
+        print(available_date)
+        print(date.today())
+        if available_date <= date.today():
             self.__book_status = "Available"
         else:
             self.__book_status = "Incoming"
         self.__available_date = available_date
         Book.count += 1
+
+    @property
+    def series(self):
+        return self.__book_series
 
     def check_available(self):
         return self.__book_status == "Available"
@@ -474,6 +490,7 @@ class Book:
     def change_activity_type(self,activity_type):
         self.__activity_type = activity_type
 
+    @property
     def get_activity_type(self):
         return self.__activity_type
 
@@ -499,9 +516,9 @@ def search_book(phonenumber:str, book_name:str,activity_type:ActivityType):
     return Bibliohub.search_book(Bibliohub.get_user_from_phone_number(phonenumber),book_name,activity_type.value)
 
 @app.get("/add_or_create_book")
-def create_book(book_name:str,series:str,author:str,category:str,price:str,activity_type:str,available_date:date = date.today()):
-    Bibliohub.add_book(Book(book_name,series,author,category,price,activity_type,available_date))
-    return
+def create_book(book_name:str,series:str,author:str,category:str,price:str,activity_type:ActivityType,available_date:date = Query(default=date.today(),description="ปี/เดือน/วัน")):
+    print(Bibliohub.add_book(Book(book_name,series,author,category,price,activity_type,available_date)))
+    return Bibliohub.get_all_book()
 
 # @app.get("/items/{item_id}/{q}")
 # def read_item(item_id: int, q: str | None = None):
