@@ -131,13 +131,13 @@ class System:
             if member.phonenumber == phonenumber:
                 return member
             
-    def search_book(self,customer,bookname,activity_type):
+    def search_book(self,customer,book_series,bookname,activity_type):
             if not customer.check_eligibility():
                 raise PermissionError("Not come in to my place go away don't comeback")
             
             for bookstock in self.__book_stock:
-                if bookstock.name == bookname:
-                    return bookstock.search_book_avaliable(activity_type)
+                if bookstock.name == book_series:
+                    return bookstock.search_book_available(bookname,activity_type)
             return "Not Found"
                 
     def search_area(self,customer,area_id):
@@ -420,9 +420,21 @@ class BookStock:
     def add_book(self,book):
         if isinstance(book,Book):
             if book.get_activity_type == "Rent":
-                self.__rent_book_list.append(book)
+                for rent_book in self.__rent_book_list:
+                    if rent_book.name == book.name:
+                        rent_book.add_book(book)
+                        return "Rent book add successful"
+                bookname = BookName(book.name)
+                bookname.add_book(book)
+                self.__rent_book_list.append(bookname)
             elif book.get_activity_type == "Purchase":
-                self.__forsale_book_list.append(book)
+                for forsale_book in self.__forsale_book_list:
+                    if forsale_book.name == book.name:
+                        forsale_book.add_book(book)
+                        return "Rent book add successful"
+                bookname = BookName(book.name)
+                bookname.add_book(book)
+                self.__forsale_book_list.append(bookname)
             else:
                 raise TypeError("Activity type error")
         else:
@@ -439,40 +451,58 @@ class BookStock:
         else:
             raise TypeError("Need to be a book")
         
-    def search_book_available(self,BookName,activity_type):
+    def search_book_available(self,bookname,activity_type):
         if activity_type == "Rent":
-            for book in self.__rent_book_list:
-                if book.book_name == BookName:
-                    if book.checkavailability():
-                        return book
+            for book_name_object in self.__rent_book_list:
+                if book_name_object.name == bookname:
+                    return book_name_object.search_book_available()
         elif activity_type == "Purchase":
-            for book in self.__forsale_book_list:
-                if book.book_name == BookName:
-                    if book.checkavailability():
-                        return book
+            for book_name_object in self.__forsale_book_list:
+                if book_name_object.name == bookname:
+                    return book_name_object.search_book_available()
         else:
             raise TypeError("Activity type error")
-        
+
+class BookName:
+    def __init__(self,name):
+        self.__name = name
+        self.__book = []
+    
+    @property
+    def name(self):
+        return self.__name
+    
+    def add_book(self,book):
+        if isinstance(book,Book):
+            self.__book.append(book)
+
+    def search_book_available(self):
+        for book in self.__book:
+            if book.check_available():
+                return book
+
 class Book:
     count = 0
 
     def __init__(self,name,series,author,category,price,activity_type,available_date=date.today()):
         self.__book_name = name
         self.__book_series = series
-        self.__book_uid = f"BK-{activity_type}-{series}-{name}-{author}-{Book.count}"
+        self.__book_uid = f"BK-{activity_type}-{series}-{name.replace(" ","_")}-{author}-{Book.count}"
         self.__author = author
         self.__category = category
         self.__price = price
         self.__activity_type = activity_type
         self.__borrowed_count = 0
-        print(available_date)
-        print(date.today())
         if available_date <= date.today():
             self.__book_status = "Available"
         else:
             self.__book_status = "Incoming"
         self.__available_date = available_date
         Book.count += 1
+
+    @property
+    def name(self):
+        return self.__book_name
 
     @property
     def series(self):
@@ -511,14 +541,15 @@ class ActivityType(str, Enum):
     Rent = "Rent"
     Purchase = "Purchase"
 
-@app.get("/search_book")
-def search_book(phonenumber:str, book_name:str,activity_type:ActivityType):
-    return Bibliohub.search_book(Bibliohub.get_user_from_phone_number(phonenumber),book_name,activity_type.value)
-
 @app.get("/add_or_create_book")
-def create_book(book_name:str,series:str,author:str,category:str,price:str,activity_type:ActivityType,available_date:date = Query(default=date.today(),description="ปี/เดือน/วัน")):
-    print(Bibliohub.add_book(Book(book_name,series,author,category,price,activity_type,available_date)))
+def create_book(book_name:str,series:str,author:str,category:str,price:float,activity_type:ActivityType,available_date:date = Query(default=date.today(),description="ปี/เดือน/วัน")):
+    print(Bibliohub.add_book(Book(book_name,series,author,category,price,activity_type.value,available_date)))
     return Bibliohub.get_all_book()
+
+@app.get("/search_book")
+def search_book(phonenumber:str,book_series:str , book_name:str,activity_type:ActivityType):
+    return Bibliohub.search_book(Bibliohub.get_user_from_phone_number(phonenumber),book_series,book_name,activity_type.value)
+
 
 # @app.get("/items/{item_id}/{q}")
 # def read_item(item_id: int, q: str | None = None):
