@@ -194,11 +194,16 @@ class System:
     def verify_permission(self,manager):
         return isinstance(manager,Manager)
     
-    def add_book_stock(self,book_stock):
-        if isinstance(book_stock,BookStock):
-            self.__book_stock.append(book_stock)
+    def add_book(self,book):
+        if isinstance(book,Book):
+            for book_stock in self.__book_stock:
+                if book_stock.name == book.series:
+                    book_stock.add_book(book)
+        
+        self.__book_stock.append(BookStock(book.series).add_book(book))
+        return "Add Book Successful"
 
-    def remove_book_stock(self,book_stock):
+    def remove_book(self,book_stock):
         if isinstance(book_stock,BookStock):
             self.__book_stock.remove(book_stock)
 
@@ -492,6 +497,11 @@ class ActivityType(str, Enum):
 @app.get("/search_book")
 def search_book(phonenumber:str, book_name:str,activity_type:ActivityType):
     return Bibliohub.search_book(Bibliohub.get_user_from_phone_number(phonenumber),book_name,activity_type.value)
+
+@app.get("/add_or_create_book")
+def create_book(book_name:str,series:str,author:str,category:str,price:str,activity_type:str,available_date:date = date.today()):
+    Bibliohub.add_book(Book(book_name,series,author,category,price,activity_type,available_date))
+    return
 
 # @app.get("/items/{item_id}/{q}")
 # def read_item(item_id: int, q: str | None = None):
