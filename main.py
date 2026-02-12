@@ -329,6 +329,11 @@ class Customer:
         self.__rental_quota = 0
         self.__strike = 0
         self.__selected_list = []
+        self.__search_result = []
+
+    @property
+    def get_search_result(self):
+        return self.__search_result
 
     @property
     def name(self):
@@ -536,7 +541,6 @@ def create_customer(name:str = Query(description="ชื่อจริงลู
     Bibliohub.add_customer(customer)
     return customer
 
-
 class ActivityType(str, Enum):
     Rent = "Rent"
     Purchase = "Purchase"
@@ -550,6 +554,7 @@ def create_book(book_name:str,series:str,author:str,category:str,price:float,act
 def search_book(phonenumber:str,book_series:str , book_name:str,activity_type:ActivityType):
     return Bibliohub.search_book(Bibliohub.get_user_from_phone_number(phonenumber),book_series,book_name,activity_type.value)
 
+# @app.get("/select")
 
 # @app.get("/items/{item_id}/{q}")
 # def read_item(item_id: int, q: str | None = None):
