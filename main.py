@@ -50,11 +50,16 @@ class System:
             self.__customer_list.remove(customer)
 
     def get_customer_list(self):
+        """
+        return customer list in list
+        """
         return self.__customer_list
 
     def check_duplicate_account(self,phonenumber):
         """
-        Docstring for check_duplicate_account
+        checking for duplicated account return in bool
+        true if found duplicated
+        false if not found duplicated
         
         :param phonenumber: เบอร์โทรศัพทธ์ผู้ใช้สำหรับค้นหาผู้ใช้ว่ามีหรือไม่
         """
@@ -130,14 +135,23 @@ class System:
         for member in self.__customer_list:
             if member.phonenumber == phonenumber:
                 return member
+        return "Customer Not Found"
             
     def search_book(self,customer,book_series,bookname,activity_type):
+            if not isinstance(customer,Customer):
+                return customer
+            
             if not customer.check_eligibility():
                 raise PermissionError("Not come in to my place go away don't comeback")
             
             for bookstock in self.__book_stock:
                 if bookstock.name == book_series:
-                    return bookstock.search_book_available(bookname,activity_type)
+                    result = bookstock.search_book_available(bookname,activity_type)
+                    add_result = customer.add_search_result(result)
+                    return {
+                        "Searching Result" : add_result,
+                        "All Customer Search Result" : customer.get_search_result
+                    }
             return "Not Found"
                 
     def search_area(self,customer,area_id):
@@ -335,6 +349,15 @@ class Customer:
     def get_search_result(self):
         return self.__search_result
 
+    def add_search_result(self,newsearch_result):
+        if isinstance(newsearch_result,(Book,Area)):
+            for result in self.__search_result:
+                if result == newsearch_result:
+                    print("Already search")
+                    return "Already search"    
+            self.__search_result.append(newsearch_result)
+            return newsearch_result
+
     @property
     def name(self):
         return self.__name
@@ -358,11 +381,11 @@ class Customer:
         return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.activity_type == "Rent"]) < 4
 
     def select(self,order):
-        if isinstance(order,Purchase):
+        if isinstance(order,(Book,Area)):
             self.__selected_list.append(order)
 
     def unselect(self,order):
-        if isinstance(order,Purchase):
+        if isinstance(order,(Book,Area)):
             self.__selected_list.remove(order)
 
     def add_notify(self,notification):
@@ -529,6 +552,18 @@ class Book:
     def get_activity_type(self):
         return self.__activity_type
 
+class ActivityType(str, Enum):
+    Rent = "Rent"
+    Purchase = "Purchase"
+
+class TypeBook(str,Enum):
+    Manga = "Manga"
+    Novel = "Novel"
+    Historical = "Historical"
+    Education = "Education"
+    Self_improvement = "Self Improvement"
+    Economic = "Economic"
+
 Bibliohub = System()
 
 @app.get("/")
@@ -541,12 +576,8 @@ def create_customer(name:str = Query(description="ชื่อจริงลู
     Bibliohub.add_customer(customer)
     return customer
 
-class ActivityType(str, Enum):
-    Rent = "Rent"
-    Purchase = "Purchase"
-
 @app.get("/add_or_create_book")
-def create_book(book_name:str,series:str,author:str,category:str,price:float,activity_type:ActivityType,available_date:date = Query(default=date.today(),description="ปี/เดือน/วัน")):
+def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,available_date:date = Query(default=date.today(),description="ปี/เดือน/วัน")):
     print(Bibliohub.add_book(Book(book_name,series,author,category,price,activity_type.value,available_date)))
     return Bibliohub.get_all_book()
 
