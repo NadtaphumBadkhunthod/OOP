@@ -74,9 +74,12 @@ class Purchase:
         pass                    
 
 class RentBook:
-    def __init__(self):
-        pass
-            
+    def __init__(self,rental_date:date,due_date:date):
+        self.__rental_date = rental_date
+        self.__due_date = due_date
+        self.__actual_return_date = None
+        self.__late_penalty_rate = 0
+
 class BookStock:
     def __init__(self,name):
         self.__name = name
@@ -216,6 +219,7 @@ class Customer:
         self.__strike = 0
         self.__selected_list = []
         self.__search_result = []
+        self.__selected_staff = None
 
     @property
     def get_selected_list(self):
@@ -224,6 +228,9 @@ class Customer:
     @property
     def get_search_result(self):
         return self.__search_result
+    
+    def select_staff(self,staff):
+        self.__selected_staff = staff
 
     def add_search_result(self,newsearch_result):
         if isinstance(newsearch_result,(Book,Area)):
@@ -487,9 +494,14 @@ class System:
             if area.id == area_id:
                 return area.list_timeslot()
             
-    def checkout(self,customer,staff,selected_list,payment_method):
+    def checkout(self,customer:Customer,staff:Staff,payment_method):
         list_order = []
         
+        if not isinstance(customer,Customer):
+            return "Not a customer"
+        
+        selected_list = customer.get_selected_list
+
         for item in selected_list:
             if isinstance(item,Book):
                 match item.get_activity_type():
@@ -556,6 +568,10 @@ class System:
         if isinstance(staff,Staff):
             self.__staff_list.append(staff)
 
+    @property
+    def get_staff_list(self):
+        return self.__staff_list
+
     def remove_staff(self,staff):
         if isinstance(staff,Staff):
             self.__staff_list.remove(staff)
@@ -616,8 +632,12 @@ def create_book(book_name:str,series:str,author:str,category:TypeBook,price:floa
 def search_book(phonenumber:str,book_series:str , book_name:str,activity_type:ActivityType):
     return Bibliohub.search_book(Bibliohub.get_user_from_phone_number(phonenumber),book_series,book_name,activity_type.value)
 
+@app.get("/get_all_search_result_list")
+def get_all_search_result_list(phonenumber:str):
+    return Bibliohub.get_user_from_phone_number(phonenumber).get_search_result
+
 @app.get("/select")
-def select(phonenumber:str,order:int):
+def select(phonenumber:str,order:int = Query(description="ลำดับการค้นหาของออเดอร์ที่ต้องการ")):
     customer = Bibliohub.get_user_from_phone_number(phonenumber)
     if order + 1 < len(customer.get_search_result):
         return "Order not in range"
@@ -627,6 +647,18 @@ def select(phonenumber:str,order:int):
         "Customer Searching List" : customer.get_search_result,
         "Customer Selected List" : customer.get_selected_list
     }
+
+@app.get("/get_staff_list")
+def get_staff_list():
+    return {i:book for i,book in enumerate(Bibliohub.get_staff_list)}
+
+@app.get("/select_staff")
+def select_staff(phonenumber:str):
+    Bibliohub.get_user_from_phone_number(phonenumber).select_staff(Bibliohub.get_staff_list)
+
+@app.get("/checkout")
+def checkout(phonenumber:str):
+    Bibliohub.checkout()
 
 create_customer("Sixsax","Saxsix","0956645474","68010366@kmitl.ac.th")
 create_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,date.today())
