@@ -1,10 +1,27 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import RedirectResponse
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from enum import Enum
+from abc import ABC, abstractmethod
 import uvicorn
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+class PaymentMethod(ABC):
+    @abstractmethod
+    def process_payment(self):
+        pass
+
+class Cash(PaymentMethod):
+    def process_payment(self):
+        pass
+
+class QRCode(PaymentMethod):
+    def process_payment(self):
+        pass
+
+class MethodPayment(str,Enum):
+    cash = "cash"
+    qrcode = "qrcode"
 
 class ActivityType(str, Enum):
     Rent = "Rent"
@@ -61,30 +78,11 @@ class BirthDate:
     def __init__(self):
         pass
 
-class Transaction:
-    def __init__(self):
-        pass
-
-class Payment:
-    def __init__(self):
-        pass
-
-class Purchase:
-    def __init__(self):
-        pass                    
-
-class RentBook:
-    def __init__(self,rental_date:date,due_date:date):
-        self.__rental_date = rental_date
-        self.__due_date = due_date
-        self.__actual_return_date = None
-        self.__late_penalty_rate = 0
-
 class BookStock:
     def __init__(self,name):
         self.__name = name
-        self.__forsale_book_list = []
-        self.__rent_book_list = []
+        self.__forsale_book_list : list[BookName] = []
+        self.__rent_book_list : list[BookName] = []
 
     @property
     def name(self):
@@ -171,6 +169,8 @@ class Book:
         else:
             self.__book_status = "Incoming"
         self.__available_date = available_date
+        self.__start_date = None 
+        self.__end_date = None
         Book.count += 1
 
     @property
@@ -180,6 +180,21 @@ class Book:
     @property
     def series(self):
         return self.__book_series
+    
+    @property
+    def start_date(self):
+        return self.__start_date
+    
+    @start_date.setter
+    def start_date(self,date : date):
+        self.__start_date = date
+
+    @property
+    def end_date(self):
+        return self.__end_date
+    
+    def calculate_end_date(self,how_many_days : int):
+        self.__end_date = self.__start_date + timedelta(days=how_many_days)
 
     def check_available(self):
         return self.__book_status == "Available"
@@ -212,14 +227,14 @@ class Customer:
         self.__surname = surname
         self.__phonenumber = phonenumber
         self.__email = email
-        self.__transaction = []
-        self.__notification_list = []
+        self.__transaction : list[Transaction] = []
+        self.__notification_list : list[Notification] = []
         self.__booking_reservation_time = None
         self.__rental_quota = 0
         self.__strike = 0
-        self.__selected_list = []
-        self.__search_result = []
-        self.__selected_staff = None
+        self.__selected_list : list[Book,Area] = []
+        self.__search_result: list[Book,Area] = []
+        self.__selected_staff : Staff = None
 
     @property
     def get_selected_list(self):
@@ -309,10 +324,9 @@ class Member(Customer):
 
 class Staff(Member):
     count = 0
-    def __init__(self, name, surname, phonenumber, email, birth_month,no_branch):
+    def __init__(self, name, surname, phonenumber, email, birth_month):
         super().__init__(name, surname, phonenumber, email, birth_month)
         self.__no_staff = f"STF-{Staff.count}"
-        self.__no_branch = no_branch
     
     def process_return(self,book,customer):
         if not isinstance(book,Book):
@@ -330,15 +344,76 @@ class Manager(Staff):
     def print_report(self):
         pass
 
+class Purchase:
+    def __init__(self):
+        pass                    
+
+class RentBook:
+    def __init__(self,rental_date:date,due_date:date):
+        self.__rental_date = rental_date
+        self.__due_date = due_date
+        self.__actual_return_date = None
+        self.__late_penalty_rate = 10
+
+    def get_penalty(self):
+        penalty = (self.__actual_return_date - self.__due_date).days * self.__late_penalty_rate
+        return 
+
+class Payment:
+    count = 0
+    def __init__(self,customer : Customer,order : list[Purchase],payment_method : PaymentMethod):
+        self.__customer = customer
+        self.__payment_no = f"PYM-{Payment.count}"
+        self.__status = "Unpaid"
+        self.__order = order
+        self.__timestamp = datetime.now()
+        self.__payment_method = payment_method
+        self.__base_fee = 10 # เท่าไหร่อ่ะ need implement
+        self.__upgrade_delta = 0
+        self.__discount_amount = 0
+        self.__penalty_fee = 0
+        self.__net_amount = 0
+
+        Payment.count += 1
+
+    def calculate_net_amount(self):
+        self.__net_amount = sum(item.calculate_subtotal() for item in self.__order) - self.__discount_amount + self.__base_fee + self.__penalty_fee
+        return self.__net_amount
+    
+    def update_payment_status(self,status):
+        self.__status = status
+
+    def add_penalty_fee(self,penalty_fee):
+        self.__penalty_fee += penalty_fee
+
+class Transaction:
+    def __init__(self,customer:Customer,staff:Staff,payment : Payment,start_date_time : datetime = datetime.now(), end_date_time : datetime = datetime.now()):
+        self.__customer = customer
+        self.__staff = staff
+        self.__start_date_time = start_date_time
+        self.__end_date_time = end_date_time
+        self.__status = "Requested"
+        self.__payment = payment
+        self.__audit_logs_list = []
+
+    def update_status(self,status):
+        self.__status = status
+
+    def add_audit_log(self,log):
+        self.__audit_logs_list.append(log)
+
+    def sync_payment_with_activity(self,rentbook : RentBook):
+        return True
+
 class System:
     def __init__(self):
-        self.__staff_list = []
-        self.__promotion_list = []
-        self.__book_stock = []
-        self.__area = []
-        self.__customer_list = []
-        self.__transaction_list = []
-        self.__notification_list = []
+        self.__staff_list : list[Staff] = []
+        self.__promotion_list : list[Promotion] = []
+        self.__book_stock : list[BookStock] = []
+        self.__area : list[Area] = []
+        self.__customer_list : list[Customer] = []
+        self.__transaction_list : list[Transaction] = []
+        self.__notification_list : list[Notification] = []
 
     def register(self,name,surname,phonenumber,email) -> Member | str:
         """
@@ -496,7 +571,7 @@ class System:
             
     def checkout(self,customer:Customer,staff:Staff,payment_method):
         list_order = []
-        
+
         if not isinstance(customer,Customer):
             return "Not a customer"
         
@@ -504,19 +579,17 @@ class System:
 
         for item in selected_list:
             if isinstance(item,Book):
-                match item.get_activity_type():
+                match item.get_activity_type:
                     case "Rent":
-                        list_order.append(RentBook(*item.data))
-                        return
+                        list_order.append(RentBook(item.start_date,item.end_date))
                     case "Purchase":
                         list_order.append(Purchase())
-                        return
                     case _: raise ValueError("Error : Activity type not found")
-        
-        payment = Payment(customer,list_order,payment_method)
-        transaction = Transaction(customer,staff,"datetime.now",payment)
 
-        transaction.add_audit_log("request : datetime.now") #need implement : เพิ่มรูปแบบของ audit log
+        payment = Payment(customer,list_order,payment_method)
+        transaction = Transaction(customer,staff,datetime.now(),payment)
+
+        transaction.add_audit_log(f"request : {datetime.now()}") #need implement : เพิ่มรูปแบบของ audit log
         net_amount = payment.process_payment() #need implement : calculate payment ใน payment ไปเลย
         print(net_amount)
         transaction.update_status("Confirm")
@@ -613,6 +686,18 @@ class System:
 
 Bibliohub = System()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_staff("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th","05")
+    create_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
+    create_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,date.today().strftime("%d/%m/%Y"))
+    search_book("1111111111","How to learn OOP","How to learn OOP",ActivityType.Rent)
+    select("1111111111",0,date.today().strftime("%d/%m/%Y"),1)
+    checkout("1111111111",0,MethodPayment.cash)
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
 @app.get("/")
 def redirect_to_docs():
     return RedirectResponse(url="/docs")
@@ -623,9 +708,18 @@ def create_customer(name:str = Query(description="ชื่อจริงลู
     Bibliohub.add_customer(customer)
     return customer
 
+@app.get("/create_staff")
+def create_staff(name:str = Query(description="ชื่อจริงพนักงาน"),surname:str = Query(description="นามสกุลพนักงาน"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์พนักงาน"),email:str = Query(description="อีเมลพนักงาน"),birth_month:int = Query(description="วันเกิดพนักงาน")):
+    if not (Bibliohub.validate_name_and_surname(name,surname) and Bibliohub.validate_phonenumber(phonenumber) and Bibliohub.validate_email):
+        return "something wrong"
+    
+    staff = Staff(name,surname,phonenumber,email,birth_month)
+    Bibliohub.add_staff(staff)
+    return staff
+
 @app.get("/add_or_create_book")
-def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,available_date:date = Query(default=date.today(),description="ปี/เดือน/วัน")):
-    print(Bibliohub.add_book(Book(book_name,series,author,category.value,price,activity_type.value,available_date)))
+def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,available_date = Query(default=date.today().strftime("%d/%m/%Y"),description="วัน/เดือน/ปี (เช่น 01/02/2026)")):
+    print(Bibliohub.add_book(Book(book_name,series,author,category.value,price,activity_type.value,datetime.strptime(available_date, "%d/%m/%Y").date())))
     return Bibliohub.get_all_book()
 
 @app.get("/search_book")
@@ -637,10 +731,12 @@ def get_all_search_result_list(phonenumber:str):
     return Bibliohub.get_user_from_phone_number(phonenumber).get_search_result
 
 @app.get("/select")
-def select(phonenumber:str,order:int = Query(description="ลำดับการค้นหาของออเดอร์ที่ต้องการ")):
+def select(phonenumber:str,order:int = Query(description="ลำดับการค้นหาของออเดอร์ที่ต้องการ"),start_date = date.today().strftime("%d/%m/%Y"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
     customer = Bibliohub.get_user_from_phone_number(phonenumber)
     if order + 1 < len(customer.get_search_result):
         return "Order not in range"
+    customer.get_search_result[order].start_date = datetime.strptime(start_date, "%d/%m/%Y").date()
+    customer.get_search_result[order].calculate_end_date(num_days)
     result = customer.select(customer.get_search_result[order])
     return {
         "Result" : result,
@@ -652,16 +748,10 @@ def select(phonenumber:str,order:int = Query(description="ลำดับกา�
 def get_staff_list():
     return {i:book for i,book in enumerate(Bibliohub.get_staff_list)}
 
-@app.get("/select_staff")
-def select_staff(phonenumber:str):
-    Bibliohub.get_user_from_phone_number(phonenumber).select_staff(Bibliohub.get_staff_list)
-
 @app.get("/checkout")
-def checkout(phonenumber:str):
-    Bibliohub.checkout()
-
-create_customer("Sixsax","Saxsix","0956645474","68010366@kmitl.ac.th")
-create_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,date.today())
+def checkout(phonenumber:str,staff_order:int,payment_method:MethodPayment):
+    Bibliohub.checkout(Bibliohub.get_user_from_phone_number(phonenumber),Bibliohub.get_staff_list[staff_order],payment_method)
+    return
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
