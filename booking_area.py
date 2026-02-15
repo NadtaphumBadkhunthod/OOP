@@ -201,7 +201,7 @@ class System :
             customer.add_point()
             self.notify_user(customer,f"{customer.name}: add point successful")
 
-        return "ทำรายการเสร็จสิ้น"
+        return f"ทำรายการสำเร็จ ชำระเงินรวมทั้งสิ้น{net_amount} บาท"
     
     def verify_permission(self,manager):
         return isinstance(manager,Manager)
