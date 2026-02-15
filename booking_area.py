@@ -255,7 +255,11 @@ class System :
         pass
 
     def generate_utilization_report(self):
-        pass        
+        pass  
+
+    @property
+    def list_area(self):
+        return self.__area      
 
 class Notification:
     count = 0
@@ -524,7 +528,19 @@ class Customer:
     @property
     def phonenumber(self):
         return self.__phonenumber
-
+    
+    @property
+    def selected_list(self):
+        return self.__selected_list
+    def update_cart(self, new_items_list):
+        """
+        เมธอดสำหรับอัปเดตรายการในตะกร้า 
+        เช่น ใช้ลบของที่จ่ายเงินเสร็จแล้วออกไป
+        """
+        if isinstance(new_items_list, list):
+            self.__selected_list = new_items_list
+            return True
+        return False
     def check_eligibility(self):
         return self.__strike < 3
     
@@ -672,7 +688,6 @@ class Book:
 from pydantic import BaseModel
 from typing import List
 
-# ส่วนที่ 1: Pydantic Models สำหรับรับข้อมูลจาก API
 class SelectAreaModel(BaseModel):
     phonenumber: str
     area_id: str
@@ -680,9 +695,8 @@ class SelectAreaModel(BaseModel):
 
 class CheckoutAreaModel(BaseModel):
     phonenumber: str
-    payment_method: str  # "QRCode" หรือ "Cash"
+    payment_method: str  # "QRCode" หรือ "Cash"เลือกเอาว่าจะชำระแบบไหน
 
-# ส่วนที่ 2: สร้างตัวแปร System และจำลองข้อมูล (Mock Data)
 bibliohub = System()
 
 bibliohub.register("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com", 5)
@@ -707,11 +721,10 @@ quiet_area.add_slot(TimeSlot("QA06", "14:00", "15:00"))
 quiet_area.add_slot(TimeSlot("QA07", "15:00", "16:00"))
 bibliohub.add_area(quiet_area)
 
-# ส่วนที่ 3: FastAPI
 @app.get("/", tags=["Booking Area"])
-def read_root():
-    all_areas_info = []
-    for area in bibliohub._System__area:
+def read_all_areas():
+    all_areas = []
+    for area in bibliohub.list_area:
         slots_list = []
         for slot in area.area__slots:
             slots_list.append({
@@ -719,9 +732,7 @@ def read_root():
                 "time_range": f"{slot.start_time} - {slot.end_time}",
                 "status": slot.is_available
             })
-            
-
-        all_areas_info.append({
+        all_areas.append({
             "area_id": area.area_id,          
             "area_type": area.area_type,       
             "hourly_rate": area.hourly_rate,  
@@ -732,12 +743,12 @@ def read_root():
         
     return {
         "message": "Welcome to BiblioHub Booking System",
-        "total_areas": len(all_areas_info),
-        "areas_catalog": all_areas_info
+        "total_areas": len(all_areas),
+        "areas_catalog": all_areas
     }
 
 @app.get("/area/search", tags=["Booking Area"])
-def api_search_area(phonenumber: str = Query(description="เบอร์โทรศัพท์ลูกค้า (เช่น 812345678)"), 
+def search_area(phonenumber: str = Query(description="เบอร์โทรศัพท์ลูกค้า (เช่น 812345678)"), 
                     area_id: str = Query(description="ชื่อ Area (เช่น MeetingRoom-01)")):
     
     customer = bibliohub.get_user_from_phone_number(phonenumber)
@@ -751,21 +762,25 @@ def api_search_area(phonenumber: str = Query(description="เบอร์โท�
         return {"error": str(e)}
 
 @app.post("/area/select", tags=["Booking Area"])
-def api_select_area(request: SelectAreaModel):
+def select_area(request: SelectAreaModel):
     customer = bibliohub.get_user_from_phone_number(request.phonenumber)
     if not customer:
         return {"error": "ไม่พบผู้ใช้ในระบบ"}
-        
-    target_area = next((a for a in bibliohub._System__area if a.area_id == request.area_id), None)
+
+    target_area = None
+
+    for a in bibliohub.list_area:
+        if a.area_id == request.area_id:
+            target_area = a
+            break   
     if not target_area:
-         return {"error": "ไม่พบพื้นที่"}
+        return {"error": "ไม่พบพื้นที่"}
 
     selected_slots = []
     
-    #วนลูปเช็คว่า ID สล็อตที่ส่งมาทั้งหมด ว่า ว่างจริงๆ ใช่ไหม?
-    for req_slot_id in request.slot_ids:
+    for req_slot_id in request.slot_ids: #เช็คว่ามันว่างจริงไหม
         found_slot = None
-        for slot in target_area._Area__slots:
+        for slot in target_area.area__slots:
             if slot.slot_id == req_slot_id:
                 found_slot = slot
                 break
@@ -779,7 +794,6 @@ def api_select_area(request: SelectAreaModel):
     if not customer.check_area_quota(requesting_count):
         return {"error": f"โควต้าเต็ม! คุณจองได้อีก {customer.get_area_quota() - customer.booking_reservation_time} ชม."}
     
-    #ถ้าผ่านด่านข้างบนมาได้ แปลว่า "ว่างครบทุกสล็อต" ก็เอาลงตะกร้าได้เลย
     for slot in selected_slots:
         temp_booking = {"type": "temp_area", "area": target_area, "slot": slot}
         customer._Customer__selected_list.append(temp_booking)
@@ -787,38 +801,37 @@ def api_select_area(request: SelectAreaModel):
     slot_names = ", ".join(request.slot_ids)
     return {"status": "Success", "message": f"นำสล็อต {slot_names} ของ {request.area_id} ใส่ตะกร้าแล้ว"}
 
-@app.post("/area/checkout", tags=["Booking Area"])
-def api_checkout_area(request: CheckoutAreaModel):
+@app.post("/area/checkout")
+def checkout_area(request: CheckoutAreaModel):
     customer = bibliohub.get_user_from_phone_number(request.phonenumber)
-    if not customer:
-        return {"error": "ไม่พบผู้ใช้ในระบบ"}
-        
-    staff = Staff() 
     
-    # 1. รวบรวมข้อมูลพื้นที่จากตะกร้า
-    temp_items = [item for item in customer._Customer__selected_list if isinstance(item, dict) and item.get("type") == "temp_area"]
+    temp_items = []
+    other_items = []
     
+    for item in customer.selected_list:
+        if isinstance(item, dict) and item.get("type") == "temp_area":
+            temp_items.append(item)
+        else:
+            other_items.append(item)
+
     if not temp_items:
-        return {"error": "ไม่มีรายการพื้นที่ในตะกร้า (กรุณาเลือกพื้นที่ก่อน)"}
+        return {"error": "ไม่มีรายการจองที่นั่ง"}
 
-    # แยกเอาเฉพาะ Slots และหา Area ต้นทาง (สมมติว่าจอง Area เดียวกันใน 1 ครั้ง)
-    reserved_slots = [item["slot"] for item in temp_items]
-    target_area = temp_items[0]["area"]
-
-    # 2. สร้าง BookingArea Object และใส่ลงในลิสต์ที่จะส่งไป checkout
-    booking_area = BookingArea(reserved_slots, target_area)
+    all_slots = []
+    for item in temp_items:
+        all_slots.append(item["slot"])
     
-    # กรองเอาของอื่นออกแล้วใส่ BookingArea เข้าไปแทน (หรือจะเอาไปต่อท้ายก็ได้)
-    final_order_list = [booking_area] 
+    the_room = temp_items[0]["area"] 
+    booking_order = BookingArea(all_slots, the_room)
 
-    # 3. ส่งเข้ากระบวนการ Checkout หลัก
     try:
-        result = bibliohub.checkout(customer, staff, final_order_list, request.payment_method)
-        # เคลียร์เฉพาะรายการพื้นที่ที่ทำรายการสำเร็จออกจากตะกร้าหลัก
-        customer._Customer__selected_list = [i for i in customer._Customer__selected_list if i not in temp_items]
+        msg = bibliohub.checkout(customer, Staff(), [booking_order], request.payment_method)
         
-        return {"status": "Success", "message": result}
+        customer.update_cart(other_items)
+        
+        return {"status": "Success", "message": msg}
+        
     except Exception as e:
-        return {"error": f"ทำรายการไม่สำเร็จ: {str(e)}"}
+        return {"error": str(e)}
 if __name__ == "__main__":
     uvicorn.run("booking_area:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
