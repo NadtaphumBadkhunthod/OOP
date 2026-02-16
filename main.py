@@ -989,17 +989,18 @@ async def lifespan(app: FastAPI):
 
     select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-0",date.today().strftime("%d/%m/%Y"),1)
     select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-1",date.today().strftime("%d/%m/%Y"),1)
+
+    try:
+        select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-2",date.today().strftime("%d/%m/%Y"),1)
+    except HTTPException as e:
+        print(f"Pass error ID Not Found : Expect 404({e})")
+        
     select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
     select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
     try:
         select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
     except HTTPException as e:
         print(f"Pass error เช่าเกิน : Expect 406 ({e})")
-    
-    try:
-        select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-2",date.today().strftime("%d/%m/%Y"),1)
-    except HTTPException as e:
-        print(f"Pass error ID Not Found : Expect 404 ({e})")
 
     checkout("1111111111","STF-0",MethodPayment.cash)
     print("Base Testcase Complete")
@@ -1103,6 +1104,13 @@ def select(phonenumber:str,item_id:str = Query(description="id ของสิ�
             series = parts[2].replace("_"," ")
             book_name = parts[3].replace("_"," ")
 
+            if activity_type == ActivityType.Rent.value:
+                if not customer.check_quota():
+                    raise HTTPException(
+                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                        detail="Quota การเช่าเกินกำหนดแล้ว"
+                    )
+
             book = Bibliohub.get_book(series,book_name,activity_type)
 
             if not book:
@@ -1110,13 +1118,6 @@ def select(phonenumber:str,item_id:str = Query(description="id ของสิ�
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Book Not Found, Maybe checking your book id"
                 )
-            
-            if activity_type == ActivityType.Rent.value:
-                if not customer.check_quota():
-                    raise HTTPException(
-                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
-                        detail="Quota การเช่าเกินกำหนดแล้ว"
-                    )
             
             customer.select(book)
 
