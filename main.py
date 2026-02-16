@@ -66,6 +66,14 @@ class Area:
 
 class Book:
     def __init__(self,book_info:BookInfo,status:BookStatus):
+        """
+        class Book คือหนังสือที่แยกตาม UID คือหนังสือแต่ละเล่มแยกกันไป เช่น โดเรม่อน เล่มที่ x อันที่ x 
+        
+        :param book_info: object ที่มีข้อมูลของหนังสือ
+        :type book_info: BookInfo
+        :param status: สถานะของหนังสือเล่มนั้น
+        :type status: BookStatus
+        """
         self.__book_info = book_info
         self.__book_uid = None
         self.__borrowed_count = 0
@@ -124,6 +132,20 @@ class Book:
 
 class BookInfo:
     def __init__(self,book_stock : BookStock,name,author,category:TypeBook,price,activity_type : ActivityType,available_date=date.today()):
+        """
+        class BookInfo คือตัวข้อมูลของหนังสือ และจะเป็นตัวเก็บ Book ไว้ เช่น โดเรม่อน เล่มที่ x แล้วข้างในจะเก็บว่ามีโดเรม่อนเล่ม x กี่เล่ม
+        
+        :param book_stock: object ที่เป็นตัวเก็บ stock หนังสือ
+        :type book_stock: BookStock
+        :param name: ชื่อของหนังสือเล่มนั้น เช่น โดเรม่อน เล่ม 1
+        :param author: ผู้แต่งของหนังสือ
+        :param category: ประเภทของหนังสือ
+        :type category: TypeBook
+        :param price: ราคาในการใช้บริการหนังสือ
+        :param activity_type: ประเภทการใช้บริการหนังสือ เช่น ซื้อ หรือ เช่า
+        :type activity_type: ActivityType
+        :param available_date: วันที่หนังสือเล่มนั้นวางขาย
+        """
         self.__name = name
         self.__book_stock = book_stock
         self.__author = author
@@ -188,6 +210,11 @@ class BookInfo:
 
 class BookStock:
     def __init__(self,name):
+        """
+        class BookStock คือ ตัวสต๊อกของหนังสือ จะเป็นตัวที่เก็บ BookInfo ไว้ เช่น โดเรม่อน แล้วข้างในจะเป็น โดเรม่อน เล่มที่ x อีกที
+
+        :param name: ชื่อของ stock เช่น โดเรม่อน
+        """
         self.__name = name
         self.__forsale_book_list : list[BookInfo] = []
         self.__rent_book_list : list[BookInfo] = []
@@ -268,7 +295,6 @@ class Customer:
         self.__rental_quota = 0
         self.__strike = 0
         self.__selected_list : list[Book,Area] = []
-        self.__selected_staff : Staff = None
 
     @property
     def get_all_transaction(self) -> list[Transaction]:
@@ -278,9 +304,6 @@ class Customer:
     def get_selected_list(self):
         return self.__selected_list
     
-    def select_staff(self,staff):
-        self.__selected_staff = staff
-
     @property
     def name(self):
         return self.__name
@@ -301,7 +324,7 @@ class Customer:
         return self.__strike < 3
     
     def check_quota(self): 
-        return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.activity_type == "Rent"]) < 4
+        return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.book_info.activity_type.value == "Rent"]) < (4 - self.__rental_quota)
 
     def select(self,order : Book | Area) -> str | Book | Area:
         if isinstance(order,(Book,Area)):
@@ -347,6 +370,10 @@ class Staff(Member):
     def __init__(self, name, surname, phonenumber, email, birth_month):
         super().__init__(name, surname, phonenumber, email, birth_month)
         self.__no_staff = f"STF-{Staff.count}"
+
+    @property
+    def no_staff(self):
+        return self.__no_staff
     
     def process_return(self,book,customer):
         if not isinstance(book,Book):
@@ -832,13 +859,26 @@ class System:
             customer.add_point()
 
         self.notify_user(customer,f"{customer.name}: add point successful")
-
+        print("Checkout Successful")
         return transaction
     
     def verify_permission(self,manager) -> bool:
         return isinstance(manager,Manager)
     
     def add_book(self,book_name,series,author,category,price,activity_type,number_of_copies,available_date) -> str:
+        inputs_to_validate = [book_name, series, author]
+    
+        for input in inputs_to_validate:
+            if isinstance(input, str):
+                if "_" in input or "-" in input:
+                    raise ValueError(f"ไม่อนุญาตให้ใส่ '_' หรือ '-' ในข้อมูล: '{input}'")
+        
+        if price <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="ราคาต้องมากกว่า 0"
+            )
+        
         if number_of_copies <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
@@ -879,6 +919,15 @@ class System:
     @property
     def get_staff_list(self):
         return self.__staff_list
+    
+    def get_staff_by_no_staff(self,no_staff):
+        for staff in self.__staff_list:
+            if staff.no_staff == no_staff:
+                return staff
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Staff Not Found"
+        )
 
     def remove_staff(self,staff):
         if isinstance(staff,Staff):
@@ -911,7 +960,9 @@ class System:
     def notify_user(self,customer,message):
         if isinstance(customer,Customer):
             if isinstance(message,str):
-                self.__notification_list.append(Notification(customer,message))
+                notification = Notification(customer,message)
+                customer.add_notify(notification)
+                self.__notification_list.append(notification)
 
     def upgrade_booking_area(self):
         pass
@@ -936,9 +987,21 @@ async def lifespan(app: FastAPI):
     # Add Copies
     create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,date.today().strftime("%d/%m/%Y"))
 
-    # search_book_by_series("1111111111","How to learn OOP")
-    # select("1111111111",0,date.today().strftime("%d/%m/%Y"),1)
-    # checkout("1111111111",0,MethodPayment.cash)
+    select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-0",date.today().strftime("%d/%m/%Y"),1)
+    select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-1",date.today().strftime("%d/%m/%Y"),1)
+    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
+    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
+    try:
+        select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
+    except HTTPException as e:
+        print(f"Pass error เช่าเกิน : Expect 406 ({e})")
+    
+    try:
+        select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-2",date.today().strftime("%d/%m/%Y"),1)
+    except HTTPException as e:
+        print(f"Pass error ID Not Found : Expect 404 ({e})")
+
+    checkout("1111111111","STF-0",MethodPayment.cash)
     print("Base Testcase Complete")
     yield
 
@@ -990,6 +1053,10 @@ def get_all_book_series():
         "All Book Series" : respond
     }
 
+@app.get("/get_all_staff")
+def get_all_staff():
+    return Bibliohub.get_staff_list
+
 @app.get("/search_book_by_series")
 def search_book_by_series(phonenumber:str,book_series:str):
     customer = Bibliohub.get_user_from_phone_number(phonenumber)
@@ -1030,7 +1097,7 @@ def select(phonenumber:str,item_id:str = Query(description="id ของสิ�
         )
     
     for id in all_id:
-        if id.startswith("BK"): # f"BK-{activity_type}-{series}-{name.replace(" ","_")}-{author}"
+        if id.startswith("BK"):
             parts = item_id.split("-")
             activity_type = parts[1]
             series = parts[2].replace("_"," ")
@@ -1043,6 +1110,13 @@ def select(phonenumber:str,item_id:str = Query(description="id ของสิ�
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Book Not Found, Maybe checking your book id"
                 )
+            
+            if activity_type == ActivityType.Rent.value:
+                if not customer.check_quota():
+                    raise HTTPException(
+                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                        detail="Quota การเช่าเกินกำหนดแล้ว"
+                    )
             
             customer.select(book)
 
@@ -1062,20 +1136,14 @@ def select(phonenumber:str,item_id:str = Query(description="id ของสิ�
                 "Book Status" : selected.book_status,
                 "Book UID" : selected.uid
             })
-
-        
-
-    # customer.get_search_result[order].start_date = datetime.strptime(start_date, "%d/%m/%Y").date()
-    # customer.get_search_result[order].calculate_end_date(num_days)
-    # result = customer.select(customer.get_search_result[order])
     print("Select Successful")
     return {
         "Customer Selected List" : respond
     }
 
 @app.get("/checkout")
-def checkout(phonenumber:str,staff_order:int,payment_method:MethodPayment):
-    transaction = Bibliohub.checkout(Bibliohub.get_user_from_phone_number(phonenumber),Bibliohub.get_staff_list[staff_order],payment_method)
+def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:MethodPayment = Query(description="วิธีการชำระเงิน")):
+    transaction = Bibliohub.checkout(Bibliohub.get_user_from_phone_number(phonenumber),Bibliohub.get_staff_by_no_staff(no_staff),payment_method)
 
     return {
         "Transaction" : {
