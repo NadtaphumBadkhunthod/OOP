@@ -9,6 +9,16 @@ from contextlib import asynccontextmanager
 
 # Enum Class
 
+class BookingBookQuota(int, Enum):
+    Silver = 6
+    Gold = 8
+    Platinum = 10
+
+class LevelMember(str, Enum):
+    Silver = "Silver"
+    Gold = "Gold"
+    Platinum = "Platinum"
+
 class BirthMonth(str, Enum):
     Jan = "01"
     Feb = "02"
@@ -277,7 +287,7 @@ class BookStock:
 class Customer:
     def __init__(self,name:str,surname:str,phonenumber:str,email:str):
         """
-        Docstring for __init__
+        class Customer คือ object ของลูกค้า
         
         :param name: ชื่อผู้ใช้
         :param surname: นามสกุล
@@ -350,13 +360,13 @@ class Customer:
             self.__transaction.append(transaction)
 
 class Member(Customer):
-    def __init__(self, name, surname, phonenumber, email, birth_month):
+    def __init__(self, name, surname, phonenumber, email, birth_month : BirthMonth):
         super().__init__(name, surname, phonenumber, email)
 
-        self.__level_member = "Silver"
+        self.__level_member = LevelMember.Silver
         self.__birth_month = birth_month
         self.__points = 0
-        self.__booking_book_quota = 6 # silver 6 gold 8 platinum 10
+        self.__booking_book_quota = BookingBookQuota.Silver
         try:
             self.__expiration_date = date.today().replace(year=date.today().year + 1)
         except:
