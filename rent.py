@@ -1034,6 +1034,7 @@ def create_staff(name:str = Query(description="ชื่อจริงพนั
         return "something wrong"
     
     staff = Staff(name,surname,phonenumber,email,birth_month.value)
+    Bibliohub.add_customer(staff)
     print(Bibliohub.add_staff(staff))
     return staff
 
@@ -1181,4 +1182,4 @@ def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพ�
     }
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
+    uvicorn.run("rent:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
