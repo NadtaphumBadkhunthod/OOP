@@ -1025,8 +1025,10 @@ def redirect_to_docs():
 @app.get("/create_customer")
 def create_customer(name:str = Query(description="ชื่อจริงลูกค้า"),surname:str = Query(description="นามสกุลลูกค้า"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์ลูกค้า"),email:str = Query(description="อีเมลลูกค้า")):
     customer = Customer(name,surname,phonenumber,email)
-    print(Bibliohub.add_customer(customer))
-    return customer
+    Bibliohub.add_customer(customer)
+    return {
+        "Result Customer" : customer 
+    }
 
 @app.get("/create_staff")
 def create_staff(name:str = Query(description="ชื่อจริงพนักงาน"),surname:str = Query(description="นามสกุลพนักงาน"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์พนักงาน"),email:str = Query(description="อีเมลพนักงาน"),birth_month:BirthMonth = Query(description="เดือนเกิดพนักงาน")):
