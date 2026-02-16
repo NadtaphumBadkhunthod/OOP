@@ -8,7 +8,7 @@ app = FastAPI()
 
 class System :
     def __init__(self):
-        self.__staff_list = []
+        self.__staff_list : list[Staff] = []
         self.__promotion_list = []
         self.__book_stock = []
         self.__area = []
@@ -201,7 +201,7 @@ class System :
             customer.add_point()
             self.notify_user(customer,f"{customer.name}: add point successful")
 
-        return f"ทำรายการสำเร็จ ชำระเงินรวมทั้งสิ้น{net_amount} บาท"
+        return f"ทำรายการสำเร็จ ชำระเงินรวมทั้งสิ้น {net_amount} บาท"
     
     def verify_permission(self,manager):
         return isinstance(manager,Manager)
@@ -548,12 +548,10 @@ class Customer:
         return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.activity_type == "Rent"]) < 4
 
     def select(self,order):
-        if isinstance(order,Purchase):
-            self.__selected_list.append(order)
+        self.__selected_list.append(order)
 
     def unselect(self,order):
-        if isinstance(order,Purchase):
-            self.__selected_list.remove(order)
+        self.__selected_list.remove(order)
 
     def add_notify(self,notification):
         if isinstance(notification,Notification):
@@ -592,9 +590,11 @@ class Member(Customer):
 
     def get_area_quota(self):
         if self.__level_member == "Silver":
-            return 4
+            return 3
         elif self.__level_member == "Gold":
-            return 8
+            return 4
+        elif self.__level_member == "Pathinum":
+            return 5
         return 2
     
     def add_point(self):
@@ -687,17 +687,18 @@ class Book:
 
 from pydantic import BaseModel
 from typing import List
+from enum import Enum
 
-class SelectAreaModel(BaseModel):
-    phonenumber: str
-    area_id: str
-    slot_ids: List[str]
+"""
+class AreaOption(str, Enum):
+    meeting_room = "MeetingRoom-01"
+    quiet_area = "Quiet-A"
 
-class CheckoutAreaModel(BaseModel):
-    phonenumber: str
-    payment_method: str  # "QRCode" หรือ "Cash"เลือกเอาว่าจะชำระแบบไหน
+    """
 
 bibliohub = System()
+
+
 
 bibliohub.register("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com", 5)
 
@@ -720,6 +721,14 @@ quiet_area.add_slot(TimeSlot("QA05", "13:00", "14:00"))
 quiet_area.add_slot(TimeSlot("QA06", "14:00", "15:00"))
 quiet_area.add_slot(TimeSlot("QA07", "15:00", "16:00"))
 bibliohub.add_area(quiet_area)
+
+area_names = {area.area_id.replace("-", "_").lower(): area.area_id for area in bibliohub.list_area}
+
+AreaOption = Enum('AreaOption', area_names, type=str)
+class PaymentOption(str, Enum):
+    qr_code = "QRCode"
+    cash = "Cash"
+
 
 @app.get("/", tags=["Booking Area"])
 def read_all_areas():
@@ -749,28 +758,32 @@ def read_all_areas():
 
 @app.get("/area/search", tags=["Booking Area"])
 def search_area(phonenumber: str = Query(description="เบอร์โทรศัพท์ลูกค้า (เช่น 812345678)"), 
-                    area_id: str = Query(description="ชื่อ Area (เช่น MeetingRoom-01)")):
+                    area_id: AreaOption = Query(..., description="เลือกพื้นที่ที่ต้องการจอง")):
     
     customer = bibliohub.get_user_from_phone_number(phonenumber)
     if not customer:
         return {"error": "ไม่พบผู้ใช้ในระบบ"}
         
     try:
-        available_slots = bibliohub.search_area(customer, area_id)
+        available_slots = bibliohub.search_area(customer, area_id.value)
         return {"area_id": area_id, "available_slots": available_slots}
     except Exception as e:
         return {"error": str(e)}
 
 @app.post("/area/select", tags=["Booking Area"])
-def select_area(request: SelectAreaModel):
-    customer = bibliohub.get_user_from_phone_number(request.phonenumber)
+def select_area(
+    phonenumber: str = Query(..., description="เบอร์โทรศัพท์ลูกค้า"),
+    area_id: AreaOption = Query(..., description="เลือกพื้นที่ที่ต้องการจอง"),
+    slot_ids: List[str] = Query(..., description="ID สล็อตที่ต้องการ (กด Add Item เพื่อเพิ่มหลายอัน)")
+):
+    customer = bibliohub.get_user_from_phone_number(phonenumber)
     if not customer:
         return {"error": "ไม่พบผู้ใช้ในระบบ"}
 
     target_area = None
 
     for a in bibliohub.list_area:
-        if a.area_id == request.area_id:
+        if a.area_id == area_id.value:
             target_area = a
             break   
     if not target_area:
@@ -778,7 +791,7 @@ def select_area(request: SelectAreaModel):
 
     selected_slots = []
     
-    for req_slot_id in request.slot_ids: #เช็คว่ามันว่างจริงไหม
+    for req_slot_id in slot_ids: #เช็คว่ามันว่างจริงไหม
         found_slot = None
         for slot in target_area.area__slots:
             if slot.slot_id == req_slot_id:
@@ -790,20 +803,23 @@ def select_area(request: SelectAreaModel):
             
         selected_slots.append(found_slot)
 
-    requesting_count = len(request.slot_ids)
+    requesting_count = len(slot_ids)
     if not customer.check_area_quota(requesting_count):
         return {"error": f"โควต้าเต็ม! คุณจองได้อีก {customer.get_area_quota() - customer.booking_reservation_time} ชม."}
     
     for slot in selected_slots:
         temp_booking = {"type": "temp_area", "area": target_area, "slot": slot}
-        customer._Customer__selected_list.append(temp_booking)
+        customer.select(temp_booking)
 
-    slot_names = ", ".join(request.slot_ids)
-    return {"status": "Success", "message": f"นำสล็อต {slot_names} ของ {request.area_id} ใส่ตะกร้าแล้ว"}
+    slot_names = ", ".join(slot_ids)
+    return {"status": "Success", "message": f"นำสล็อต {slot_names} ของ {area_id.value} ใส่ตะกร้าแล้ว"}
 
 @app.post("/area/checkout")
-def checkout_area(request: CheckoutAreaModel):
-    customer = bibliohub.get_user_from_phone_number(request.phonenumber)
+def checkout_area(
+    phonenumber: str = Query(..., description="เบอร์โทรศัพท์ลูกค้า"),
+    payment_method: PaymentOption = Query(..., description="เลือกช่องทางการชำระเงิน")
+):  
+    customer = bibliohub.get_user_from_phone_number(phonenumber)
     
     temp_items = []
     other_items = []
@@ -825,7 +841,7 @@ def checkout_area(request: CheckoutAreaModel):
     booking_order = BookingArea(all_slots, the_room)
 
     try:
-        msg = bibliohub.checkout(customer, Staff(), [booking_order], request.payment_method)
+        msg = bibliohub.checkout(customer, Staff(), [booking_order], payment_method)
         
         customer.update_cart(other_items)
         
