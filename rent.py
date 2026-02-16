@@ -70,10 +70,6 @@ class TransactionStatus(str,Enum):
 
 # Core Class
 
-class Area:
-    def __init__(self):
-        pass
-
 class Book:
     def __init__(self,book_info:BookInfo,status:BookStatus):
         """
@@ -86,11 +82,9 @@ class Book:
         """
         self.__book_info = book_info
         self.__book_uid = None
-        self.__borrowed_count = 0
         self.__book_status = status
         self.__start_date = None 
         self.__end_date = None
-        self.__actual_return_date = None
     
     @property
     def book_info(self):
@@ -136,9 +130,6 @@ class Book:
     
     def change_status(self,status:BookStatus):
         self.__book_status = status.value
-    
-    def change_activity_type(self,activity_type:ActivityType):
-        self.__activity_type = activity_type
 
 class BookInfo:
     def __init__(self,book_stock : BookStock,name,author,category:TypeBook,price,activity_type : ActivityType,available_date=date.today()):
@@ -301,10 +292,9 @@ class Customer:
         self.__email = email
         self.__transaction : list[Transaction] = []
         self.__notification_list : list[Notification] = []
-        self.__booking_reservation_time = None
         self.__rental_quota = 0
         self.__strike = 0
-        self.__selected_list : list[Book,Area] = []
+        self.__selected_list : list[Book] = []
 
     @property
     def get_all_transaction(self) -> list[Transaction]:
@@ -336,17 +326,11 @@ class Customer:
     def check_quota(self): 
         return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.book_info.activity_type.value == "Rent"]) < (4 - self.__rental_quota)
 
-    def select(self,order : Book | Area) -> str | Book | Area:
-        if isinstance(order,(Book,Area)):
+    def select(self,order : Book) -> str | Book:
+        if isinstance(order,(Book)):
             self.__selected_list.append(order)
             if isinstance(order,Book):
                 order.change_status(BookStatus.Selected)
-            
-            # Need implement Area
-            """
-            if isinstance(order,Area):
-                return order.something(Status.Selected)
-            """
 
             return order
         return "Not Found"
@@ -384,26 +368,10 @@ class Staff(Member):
     @property
     def no_staff(self):
         return self.__no_staff
-    
-    def process_return(self,book,customer):
-        if not isinstance(book,Book):
-            raise ValueError("Not a book")
-        
-        if not isinstance(customer,Customer):
-            raise ValueError("Not a customer")
-        
-        # Need implement
-
-class Manager(Staff):
-    def __init__(self, name, surname, phonenumber, email, birth_month, no_branch):
-        super().__init__(name, surname, phonenumber, email, birth_month, no_branch)
-    
-    def print_report(self):
-        pass
 
 class Purchase:
-    def __init__(self,order : list[Book,Area]):
-        self._order : list[Book,Area] = order
+    def __init__(self,order : list[Book]):
+        self._order : list[Book] = order
 
     @property
     def get_order(self):
@@ -417,7 +385,7 @@ class Purchase:
             item.change_status(BookStatus.Purchased)
 
 class RentBook(Purchase):
-    def __init__(self,order : list[Book,Area]):
+    def __init__(self,order : list[Book]):
         super().__init__(order)
         self.__late_penalty_rate = 10
 
@@ -476,31 +444,6 @@ class Order:
     def confirm(self):
         self.__purchase_book.confirm()
         self.__rent_book.confirm()
-
-class Promotion:
-    def __init__(self,promo_code,discount_rate):
-        self.__promo_code = promo_code
-        self.__discount_rate = discount_rate
-        self.__status = False
-        self.__used_user = []
-        
-    def is_eligible(self,customer):
-        if isinstance(customer,Customer):
-            return customer not in self.__used_user
-        
-    def apply_discount(self,price,customer):
-        if isinstance(customer,Customer):
-            if self.is_eligible(customer):
-                self.__used_user.append(customer)
-                return price - (price * self.__discount_rate)
-            
-    def payment_unsuccess(self,customer):
-        if isinstance(customer,Customer):
-            self.__used_user.remove(customer)
-
-class BirthDate:
-    def __init__(self):
-        pass
 
 class PaymentMethod(ABC):
     @property
@@ -599,9 +542,6 @@ class Payment:
     def update_payment_status(self,status:PaymentStatus):
         self.__status = status.value
 
-    def add_penalty_fee(self,penalty_fee):
-        self.__penalty_fee += penalty_fee
-
 class Transaction:
     def __init__(self,customer:Customer,staff:Staff,payment : Payment,start_date_time : datetime = datetime.now(), end_date_time : datetime = datetime.now()):
         self.__customer = customer
@@ -645,9 +585,6 @@ class Transaction:
 
     def add_audit_log(self,log):
         self.__audit_logs_list.append(log)
-
-    def sync_payment_with_activity(self,rentbook : RentBook):
-        return True
     
 class Notification:
     count = 0
@@ -661,33 +598,11 @@ class Notification:
 class System:
     def __init__(self):
         self.__staff_list : list[Staff] = []
-        self.__promotion_list : list[Promotion] = []
         self.__book_stock : list[BookStock] = []
-        self.__area : list[Area] = []
         self.__customer_list : list[Customer] = []
         self.__transaction_list : list[Transaction] = []
         self.__notification_list : list[Notification] = []
 
-    def register(self,name,surname,phonenumber,email) -> Member | str:
-        """
-        Registering create member object by using Customer data.
-        :param name: name of customer
-        :param surname: surname of customer
-        :param phonenumber: phonenumber of customer
-        :param email: email of customer
-        """
-
-        if (not (self.validate_name_and_surname(name,surname) and self.validate_email(email) and self.validate_phonenumber(phonenumber))):
-            return "Input not in a right form"
-        
-        if (self.check_duplicate_account(phonenumber)):
-            return "Account duplicated"
-        
-        member = Member(name,surname,phonenumber,email)
-        self.__customer_list.append(member)
-
-        return member
-    
     def add_customer(self,customer):
         if isinstance(customer,Customer):
             if (not (self.validate_name_and_surname(customer.name,customer.surname) and self.validate_email(customer.email) and self.validate_phonenumber(customer.phonenumber))):
@@ -697,18 +612,6 @@ class System:
                 raise IndexError()
             self.__customer_list.append(customer)
             return "Add customer successful"
-
-    def delete_customer(self,customer):
-        if isinstance(customer,Customer):
-            self.__customer_list.remove(customer)
-            return "Remove customer successful"
-        return "Not Found"
-
-    def get_customer_list(self) -> list:
-        """
-        return customer list in list
-        """
-        return self.__customer_list
 
     def check_duplicate_account(self,phonenumber) -> bool:
         """
@@ -815,14 +718,6 @@ class System:
                 if bookstock.name == book_series:
                     return bookstock.search_book_available(bookname,activity_type) 
             return None
-                
-    def search_area(self,customer,area_id) -> Area | None:
-        if not customer.check_eligibility():
-                raise PermissionError("Not come in to my place go away don't comeback")
-        
-        for area in self.__area:
-            if area.id == area_id:
-                return area.list_timeslot()
             
     def checkout(self,customer:Customer,staff:Staff,payment_method : MethodPayment):
         order = Order()
@@ -871,9 +766,6 @@ class System:
         self.notify_user(customer,f"{customer.name}: add point successful")
         print("Checkout Successful")
         return transaction
-    
-    def verify_permission(self,manager) -> bool:
-        return isinstance(manager,Manager)
     
     def add_book(self,book_name,series,author,category,price,activity_type,number_of_copies,available_date) -> str:
         inputs_to_validate = [book_name, series, author]
@@ -938,47 +830,13 @@ class System:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Staff Not Found"
         )
-
-    def remove_staff(self,staff):
-        if isinstance(staff,Staff):
-            self.__staff_list.remove(staff)
-
-    def add_promotion(self,promotion):
-        if isinstance(promotion,Promotion):
-            self.__promotion_list.append(promotion)
-
-    def remove_promotion(self,promotion):
-        if isinstance(promotion,Promotion):
-            self.__promotion_list.remove(promotion)
     
-    def add_area(self,area):
-        if isinstance(area,Area):
-            self.__area.append(area)
-
-    def remove_area(self,area):
-        if isinstance(area,Area):
-            self.__area.remove(area) 
-    
-    def add_strike(self,customer):
-        if isinstance(customer,Customer):
-            customer.add_stike()
-
-    def reduce_strike(self,customer):
-        if isinstance(customer,Customer):
-            customer.reduce_strike()
-
     def notify_user(self,customer,message):
         if isinstance(customer,Customer):
             if isinstance(message,str):
                 notification = Notification(customer,message)
                 customer.add_notify(notification)
-                self.__notification_list.append(notification)
-
-    def upgrade_booking_area(self):
-        pass
-
-    def generate_utilization_report(self):
-        pass        
+                self.__notification_list.append(notification)    
     
 Bibliohub = System()
 
@@ -1183,4 +1041,4 @@ def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพ�
     }
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
+    uvicorn.run("rent:app", host="127.0.0.1", port=8000, log_level="info",reload=True)

@@ -11,11 +11,11 @@ sequenceDiagram
     Customer->>System: upgrade_booking_area(new_type)
     System->>System: search_area(new_type)
     System->>NewArea: list_timeslot()
+    NewArea-->>System: return empty area
     
     alt ไม่มีพื้นที่ว่างในประเภทที่ต้องการ
         System-->>Customer: notify_error("No available slots for this type")
     else พบพื้นที่ว่าง
-		NewArea-->>System: return empty area
         System->>BArea: calculate_upgrade_delta(new_area)
         Note right of BArea: คำนวณส่วนต่างจากเวลาที่เหลือ <br/> และส่วนต่าง hourly_rate
         BArea-->>System: return upgrade_delta
@@ -30,6 +30,7 @@ sequenceDiagram
         Pay-->>System: return payment_confirmed
 
         System->>BArea: update_reserved_slots(new_slots)
+        BArea-->>System: return update success
         
         loop Release & Occupy
             System->>Slot: update_slot(old_slot, is_available=True)
