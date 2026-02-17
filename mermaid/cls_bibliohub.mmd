@@ -5,6 +5,11 @@ config:
 ---
 classDiagram
 direction TB
+	class Staff {
+	    -no_staff
+	    -no_branch "อยู่สาขาไหนจ๊ะ"
+	    +process_return(book,customer)
+    }
 
     class ActivityType {
         <<enumeration>>
@@ -59,69 +64,20 @@ direction TB
         Jan - Dec
     }
 
-    class BiblioHubSystem {
-        -List staff_list
-        -List promotion_list
-        -List book_stock
-        -List area
-        -List customer_list
-        -List transaction_list
-        -List notification_list
-        +register()
-        +add_book_stock()
-        +add_staff()
-        +add_promotion()
-        +add_area()
-        +remove_area()
-        +add_strike()
-        +reduce_strike()
-        +notify_user()
-        +upgrade_booking_area()
-        +generate_utilization_report()
-        +check_duplicate_account()
-        +validate_input_data()
-        +get_user_from_phone_number()
-        +search_book()
-        +search_area()
-        +checkout()
-    }
-	
-    class Customer {
-        -String __name
-        -String __surname
-        -String __phonenumber
-        -String __email
-        -List~Transaction~ __transaction
-        -List~Notification~ __notification_list
-        -DateTime __booking_reservation_time
-        -Int __rental_quota
-        -Int __strike
-        -List~Book,Area~ __selected_list
-        +check_eligibility()
-        +check_quota()
-        +select(order)
-        +add_notify(notification)
-        +add_transaction(transaction)
-    }
-
-    class Member {
-        -LevelMember __level_member
-        -BirthMonth __birth_month
-        -Int __points
-        -BookingBookQuota __booking_book_quota
-        -Date __expiration_date
-        +add_point()
-    }
-
-    class Staff {
-        -Int count$
-        -String __no_staff
-        -String __no_branch
-        +process_return(book, customer)
-    }
-
-    class Manager {
-        +print_report()
+    class Book {
+        -BookInfo book_info
+        -String book_uid
+        -Int borrowed_count
+        -BookStatus book_status "Selected, Available, Incoming, Not Available"
+        -Date start_date
+        -Date end_date
+        -Date actual_return_date
+        +calculate_end_date(how_many_days: int)
+        +check_availability()
+        +change_status()
+		+get_rate_info()
+        +change_activity_type(activity_type: ActivityType)
+		+get_activity_type()
     }
 
     class BookInfo {
@@ -138,143 +94,194 @@ direction TB
         +search_book_available()
     }
 
-    class Book {
-        -BookInfo __book_info
-        -String __book_uid
-        -Int __borrowed_count
-        -BookStatus __book_status
-        -Date __start_date
-        -Date __end_date
-        -Date __actual_return_date
-        +calculate_end_date(how_many_days: int)
-        +check_available()
-        +change_status(status: BookStatus)
-        +change_activity_type(activity_type: ActivityType)
-    }
-
     class BookStock {
-        -String __name
-        -List~BookInfo~ __forsale_book_list
-        -List~BookInfo~ __rent_book_list
+        -String name
+        -List forsale_book_list[]
+	    -List rent_book_list[]
         +get_book_list(activity_type: ActivityType)
         +add_book_info(book_info: BookInfo, activity_type: ActivityType)
         +remove_book(book)
-        +search_book_available(bookname, activity_type)
+        +search_book_avaliable() "ใส่มาจ้วยว่าจะ search อะยัย"
+    }
+
+	class TimeSlot {
+	    -Area area "เก็บว่ามาจากไหน"
+	    -DateTime start_time
+	    -DateTime end_time
+	    -Bool is_available
+	    +update_slot()
     }
 
     class Area {
         -String area_id
         -String area_type
-        -Float hourly_rate
-        -List feature
+	    -Float hourly_rate "ค่าบริการรายชั่วโมง"
+	    -List feature[]
         -Int capacity
-        -List slots
+	    -List slots[] "มีสล๊อตไหนบ้าง"
         +list_timeslot()
         +get_rate_info()
     }
 
-    class TimeSlot {
-        -Area area
-        -DateTime start_time
-        -DateTime end_time
-        -Bool is_available
-        +update_slot()
-    }
-
-    class Order {
-        -RentBook __rent_book
-        -Purchase __purchase_book
-        +calculate_subtotal()
-        +confirm()
-    }
-
-    class Purchase {
-        -List~Book,Area~ _order
-        +calculate_subtotal()
-        +confirm()
-    }
-
-    class RentBook {
-        -Float __late_penalty_rate
-        +get_penalty()
-        +confirm()
-    }
-
-    class BookingBook {
-        +confirm()
-    }
-
-    class BookingArea {
-        +confirm()
-    }
-
-    class Promotion {
-		<<abstract>>
-        -String __promo_code
-        -Float __discount_rate
-        -Bool __status
-        -List __used_user
-        +is_eligible(customer)
-        +apply_discount(price, customer)
-        +payment_unsuccess(customer)
-    }
-    
-    class BirthDate
-    class DoubleDate
-
-    class PaymentMethod {
-        <<abstract>>
-        +name*
-        +process_payment(Amount)*
+	class QRCode {
+	    -String gateway_reference
+	    +process_payment()
     }
 
     class Cash {
-        -String __name
-        +process_payment(Amount)
+	    +process_payment()
     }
 
-    class QRCode {
-        -String __name
-        -String __phonenumber
-        +process_payment(Amount)
+	class Promotion {
+	    -String promo_code
+	    -Float discount_rate
+	    -Bool is_active
+	    -List Used_User
+	    +is_eligible()
+	    +apply_discount()
+    }
+    
+    class DoubleDate {
+	    -List day_pattern
+	    +is_eligible() "อยู่ในวันเข้าร่วมโปรโมชั่นหริอไม่"
+    }
+
+    class BirthDate {
+	    -Int birth_month
+	    +is_eligible() "เป็นสมาชิก และ อยู้่ในเดือนเกิดหรือไม่"
+    }
+
+	class Transaction {
+	    -Customer user "ผู้ทำรายการ"
+	    -Staff staff "staff_obj"
+	    -DateTime start_date_time "วันที่เริ่มรายการ"
+	    -DateTime end_date_time "กำหนดการสิ้นสุด"
+	    -String status "Requested, Confirmed, In Use, Completed, Cancelled"
+	    -Payment payment "เอาทั้งobjectPaymentมาใส่เลย"
+	    -List audit_logs_list[] "บันทึกการแก้ไขข้อมูลในรายการนี้"
+	    +update_status()
+	    +add_audit_log() "Log of Transaction"
+	    +sync_payment_with_activity() "ดึงค่าปรับจาก RentBook มาใส่ Payment"
+    }
+
+    class BookingArea {
+	    -List reserved_slots[]
+	    +calculate_total_price()
+	    +request_upgrade() "request กลับระบบไป search area"
+	    +calculate_upgrade_delta()
+	    +update_reserved_slots()
+    }
+
+	class BookingBook {
+	    -List book_list[]
+	    -DateTime reservation_date "วันที่จองหนังสือ"
+	    -DateTime pickup_deadline"เวลาสุดท้ายที่ต้องมารับหนังสือ"
+	    +check_pickup_deadline()
+	    +calculate_total_books()
+    }
+
+	class RentBook {
+	    -DateTime rental_date "วันที่เช่าตามกำหนด"
+	    -DateTime due_date "วันที่ต้องคืนตามกำหนด"
+	    -DateTime actual_return_date"วันที่คืนจริง"
+	    -Float late_penalty_rate"อัตราค่าปรับต่อวันของหนังสือเล่มนั้น"
+	    +calculate_late_penalty()
+    }
+
+    class Purchase {
+	    -List purchase_items[]
+	    +calculate_subtotal()
     }
 
     class Payment {
-        -Int count$
-        -Customer __customer
-        -String __payment_no
-        -String __status
-        -Order __order
-        -DateTime __timestamp
-        -PaymentMethod __payment_method
-        -Float __base_fee
-        -Float __upgrade_delta
-        -Float __discount_amount
-        -Float __penalty_fee
-        -Float __net_amount
+        -Customer customer "ผู้ทำรายการ"
+        -String payment_no "เลขสลีปปื้ง"
+        -String status"Unpaid, Paid, Voided"
+        -List order "เก็บก้อน BookingCafe/BookingBook/RentBook/Purchase"
+        -DateTime timestamp
+        -PaymentMethod payment_method
+        -base_fee"ค่าบริการหลัก"
+	    -upgrade_delta"ยอดส่วนต่างจากการอัปเกรด"
+	    -discount_amount"ยอดส่วนลด"
+	    -penalty_fee"ค่าปรับทั้งหมด"
+	    -net_amount"ยอดสุทธิที่ต้องจ่าย"
         +calculate_net_amount()
         +update_payment_status(status: PaymentStatus)
         +add_penalty_fee(penalty_fee)
     }
 
-    class Transaction {
-        -Customer __customer
-        -Staff __staff
-        -DateTime __start_date_time
-        -DateTime __end_date_time
-        -String __status
-        -Payment __payment
-        -List __audit_logs_list
-        +update_status(status: TransactionStatus)
-        +add_audit_log(log)
-        +sync_payment_with_activity(rentbook: RentBook)
+	class PaymentMethod {
+        <<abstract>>
+        +name*
+        +process_payment(Amount)*
+	}
+
+	class Manager {
+        +print_report()
     }
 
     class Notification {
-        -Int count$
-        -Customer __customer
-        -String __message
-        -String __uid
+	    -String message
+	    -Customer target_user
+	    -String notification_id
+	    +send_message() "send_expiry_alert(transaction, lead_time) "
+    }
+
+	class Customer {
+        -String name
+        -String surname
+        -String phonenumber
+        -String email
+        -List transaction[]
+        -List notification_list[]
+        -DateTime booking_reservation_time "แต่ละระดับจะมีค่าไม่เท่ากัน"
+	    -Int rental_quota "แต่ละระดับจะมีค่าไม่เท่ากัน"
+	    -Int strike "จำนวนการเตือน"
+	    -List select[] "เลือกอะไรจากร้านบ้าง"
+	    +check_eligibility() "เช็คสิทธิ์ในการทำรายการ : มีหนี้ หรือ ประวัติไม่ดี"
+        +check_quota()
+        +select() "ไปเอา return มาจากระบบตอน search"
+		+unselect()
+        +add_notify(notification)
+        +add_transaction(transaction)
+    }
+
+	class Member {
+	    -String level_member
+	    -Int birth_month
+	    -Int points
+	    -Int booking_book_quota "ต่างกันในแต่ละรดับ"
+	    -DateTime expiration_date
+        +add_point()
+    }
+
+	class BiblioHubSystem {
+	    -List staff_list[]
+	    -List promotion_list[]
+	    -List book_stock[]
+	    -List area[]
+	    -List customer_list[]
+	    -List transaction_list[]
+	    -List notification_list[]
+        +register()
+	    +delete_member()
+	    +check_duplicate_account()
+	    +validate_input_data()
+	    +get_user_from_phone_number()
+	    +search_book()
+	    +search_area()
+	    +checkout()
+	    +verify_permission()
+        +add_book_stock()
+        +add_staff()
+        +add_promotion()
+        +add_area()
+        +remove_area()
+        +add_strike()
+        +reduce_strike()
+        +notify_user()
+	    +upgrade_booking_area() "อัพเกรดarea"
+        +generate_utilization_report()
     }
 
     BiblioHubSystem "0..*" <-- "1" BookingArea
