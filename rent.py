@@ -707,11 +707,17 @@ class System:
     def get_all_book(self):
         return self.__book_stock
     
-    def search_book(self,book_series) -> dict | str:
-            for bookstock in self.__book_stock:
-                if bookstock.name == book_series:
-                    return bookstock
-            return "Not Found"
+    def search_book(self,phonenumber,book_series) -> BookStock | str:
+        customer = Bibliohub.get_user_from_phone_number(phonenumber)    
+        if not customer.check_eligibility():
+            raise HTTPException(
+                status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                detail="Don't come in to my place, Go away and don't comeback"
+            )
+        for bookstock in self.__book_stock:
+            if bookstock.name == book_series:
+                return bookstock
+        return "Not Found"
             
     def get_book(self,book_series,bookname,activity_type) -> Book | None:
             for bookstock in self.__book_stock:
@@ -930,22 +936,9 @@ def get_all_staff():
 
 @app.get("/search_book_by_series")
 def search_book_by_series(phonenumber:str,book_series:str):
-    customer = Bibliohub.get_user_from_phone_number(phonenumber)
-    if not isinstance(customer,Customer):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Not a customer, Please create customer first"
-        )
-    
-    if not customer.check_eligibility():
-        raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE,
-            detail="Don't come in to my place, Go away and don't comeback"
-        )
-    
     respond = []
 
-    bookstock = Bibliohub.search_book(book_series)
+    bookstock = Bibliohub.search_book(phonenumber,book_series)
     respond.append({
         "Book Series" : bookstock.name,
         "Book For Sales" : [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Purchase)],

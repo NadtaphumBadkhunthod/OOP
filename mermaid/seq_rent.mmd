@@ -4,100 +4,145 @@ sequenceDiagram
     actor MB as Member
     participant SYS as BiblioHubSystem
     participant BS as BookStock
+    participant BI as BookInfo
     participant BK as Book
 
-    loop Select Book 
-        NMB ->> SYS: search_book(customer,"Name Book",activity_type)
-
+    loop Search Book 
+        NMB ->> SYS: search_book(phonenumber,book_series)
+        activate SYS
+        activate NMB
+        SYS ->> SYS: get_user_from_phone_number(phonenumber)
         SYS ->> NMB: check_eligibility()
-        NMB -->> SYS: return eligibility status [bool]
+        NMB -->> SYS: return eligibility status : bool
 
-        alt eligibility
-            SYS ->> BS: search_book_avaliable(BookName,activity_type)
-            BS ->> BK: check_availability()
-            BK -->> BS: return availability[bool]
-            BS -->> SYS: return book[object]
-            
-
-            alt Book Available
-                SYS -->> NMB: return book[object]
-
-                opt want that book
-                    NMB ->> NMB: select(book[object])
-                    NMB ->> BK: change_status("Selected")
-                end
-
-                opt already have book and don't want that book
-                    NMB ->> NMB: unselect(book[object])
-                    NMB ->> BK: change_status("Available")
-                end
-            else
-                SYS -->> NMB: return No Book Available
-            end
-
-        else
-            SYS --> NMB: return you not able to rent
+        alt eligibility successful
+            SYS ->> BS: get_name()
+            activate BS
+            BS -->> SYS: return name [String]
+            deactivate BS
+            SYS -->> NMB: return bookstock [object]
+        else eligibility unsuccessful
+            SYS -->> NMB: Don't come in to my place, Go away and don't comeback
         end
 
+        deactivate SYS
     end
 
-    loop select action type
-        NMB ->> BK: change_activity_type
-        
-        opt rent action type
-            BK ->> NMB: check_quota()
-            NMB -->> BK: return quota status [bool]
-
-            opt due quota limit
-                BK -->> NMB: error due quota limit
-            end
-
-        end
-
-
-        BK -->> NMB: change_activity_type successful
+    loop Select Book
+        NMB ->> SYS: select_book(phonenumber,book_id,start_date,num_days)
+        activate SYS
+        SYS ->> SYS: get_user_from_phone_number(phonenumber)
+        SYS ->> NMB: check_quota()
+        NMB -->> SYS: return quota status [bool]
+        deactivate NMB
+        SYS ->> SYS: get_book(series,book_name,activity_type)
+        SYS ->> BS: search_book_available(bookname,activity_type)
+        activate BS
+        BS ->> BI: search_book_available()
+        activate BI
+        BI -->> BS: return book_info [object]
+        deactivate BI
+        BS -->> SYS: return book [object]
+        deactivate BS
+        SYS ->> NMB: select(book)
+        activate NMB
+        NMB -->> SYS: return select successful
+        SYS -->> NMB: return select successful
+        deactivate SYS
     end
 
-    NMB ->> SYS: checkout(select[List])
-    loop all in select
-        SYS ->> BK: get_activity_type()
-        BK -->> SYS: return activity_type [String]
-        opt is RentBook
-            create participant RB as RentBook
-            SYS ->> RB: create(rental_date,due_date)
-            RB -->> SYS: return RentBook object [object]
-            create participant PS as Payment
-            SYS ->> PS: create(order)
-            PS -->> SYS: return payment object [object]
+    NMB ->> SYS: checkout(customer,staff,payment_method)
+    deactivate NMB
+    activate SYS
+    create participant Order as Order
+    SYS ->> Order: create()
+    activate Order
+    Order -->> SYS: return order object [object]
+    deactivate Order
 
-            create participant TS as Transaction
-            SYS ->> TS: create(user,staff,start_date_time,end_date_time,status,payment)
-            TS -->> SYS: return transaction object [object]
+    SYS ->> NMB: get_selected_list()
+    NMB -->> SYS: return selected_list [list]
 
-        end
-        
+    alt is RentBook
+        create participant RB as RentBook
+        SYS ->> RB: create(book_rent_list)
+        activate RB
+        RB -->> SYS: return RentBook object [object]
+        deactivate RB
+        SYS ->> Order: set_rent_book(RentBook[object])
+        activate Order
+        Order -->> SYS: return set_rent_book successful
+        deactivate Order
+    else is PurchaseBook
+        create participant PB as PurchaseBook
+        SYS ->> PB: create(book_purchase_list)
+        activate PB
+        PB -->> SYS: return PurchaseBook object [object]
+        deactivate PB
+        SYS ->> Order: set_purchase_book(PurchaseBook[object])
+        activate Order
+        Order -->> SYS: return set_purchase_book successful
+        deactivate Order
     end
 
-    SYS ->> PS: payment_method()
-    PS -->> SYS: return successful
+    create participant PMM as PaymentMethod
+    SYS ->> PMM: create(payment_method)
+    activate PMM
+    PMM -->> SYS: return PaymentMethod object [object]
+    deactivate PMM
+
+    create participant PM as Payment
+    SYS ->> PM: process_payment(customer,order,payment_method)
+    activate PM
+    PM -->> SYS: return payment status [bool]
+    deactivate PM
+    create participant TS as Transaction
+    SYS ->> TS: create(customer,staff,payment,datetime.now(),datetime.now())
+    activate TS
+    TS -->> SYS: return Transaction object [object]
+
+    SYS ->> TS: add_audit_log("Transaction requested")
+    TS -->> SYS: return add_audit_log successful
+    deactivate TS
+
+    SYS ->> PM: calculate_net_amount()
+    activate PM
+    PM -->> SYS: return net amount [float]
+    deactivate PM
+
+    SYS ->> PMM: process_payment()
+    activate PMM
+    PMM -->> SYS: return payment status [bool]
+    deactivate PMM
 
     alt Payment successful
-        SYS ->> TS: update_status()
+        SYS ->> PM: update_payment_status("Paid")
+        activate PM
+        PM -->> SYS: return update_payment_status successful
+        deactivate PM
+        SYS ->> TS: update_transaction_status("Confirmed")
+        activate TS
         TS -->> SYS: return successful
+        SYS ->> TS: add_audit_log("transaction completed")
+        TS -->> SYS: return add_audit_log successful
+        deactivate TS
 
-        loop All Book
-            SYS ->> BK: change_status("Not Available")
-            BK -->> SYS: change_status successful
-        end
+        SYS ->> Order: confirm()
+        activate Order
+        Order -->> SYS: return confirm successful
+        deactivate Order
 
         SYS ->> SYS: notify_user()
         create participant Notify as Notification
         SYS ->> Notify: create(message,target_user)
+        activate Notify
         Notify -->> SYS: return Notification [object]
         SYS ->> Notify: send_message()
         Notify -->> SYS: return Notification status [object]
+        deactivate Notify
 
         SYS ->> NMB: add_transaction(Transaction[object])
+        activate NMB
         NMB -->> SYS: return add_transaction status[bool]
 
         SYS ->> NMB: add notify()
@@ -105,11 +150,16 @@ sequenceDiagram
 
         opt is Member
             SYS ->> MB: add_point()
+            activate MB
+            MB -->> SYS: return add_point successful
+            deactivate MB
         end
         SYS -->> NMB: return checkout successful
 
     else
         SYS -->> NMB: return checkout unsuccessful
+        deactivate NMB
+        deactivate SYS
     end
 
 
