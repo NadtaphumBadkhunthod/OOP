@@ -7,34 +7,14 @@ sequenceDiagram
     participant BK as Book
 
     loop Select Book 
-        NMB ->> SYS: search_book(customer,"Name Book",activity_type)
-
+        NMB ->> SYS: search_book(phonenumber,book_series)
+        SYS ->> SYS: get_user_from_phone_number(phonenumber)
         SYS ->> NMB: check_eligibility()
-        NMB -->> SYS: return eligibility status [bool]
+        NMB -->> SYS: return eligibility status : bool
 
-        alt eligibility
-            SYS ->> BS: search_book_avaliable(BookName,activity_type)
-            BS ->> BK: check_availability()
-            BK -->> BS: return availability[bool]
-            BS -->> SYS: return book[object]
-            
-
-            alt Book Available
-                SYS -->> NMB: return book[object]
-
-                opt want that book
-                    NMB ->> NMB: select(book[object])
-                    NMB ->> BK: change_status("Selected")
-                end
-
-                opt already have book and don't want that book
-                    NMB ->> NMB: unselect(book[object])
-                    NMB ->> BK: change_status("Available")
-                end
-            else
-                SYS -->> NMB: return No Book Available
-            end
-
+        alt eligibility successful
+            BS -->> SYS: return bookstock [object]
+            SYS ->> NMB: return bookstock
         else
             SYS --> NMB: return you not able to rent
         end
