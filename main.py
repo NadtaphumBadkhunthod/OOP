@@ -270,7 +270,7 @@ class BookStock:
         else:
             raise TypeError("Need to be a book")
         
-    def search_book_available(self,bookname,activity_type):
+    def get_book_available(self,bookname,activity_type):
         if activity_type == "Rent":
             target_list = self.__rent_book_list
         elif activity_type == "Purchase":
@@ -803,26 +803,93 @@ class System:
     
     def get_all_book(self):
         return self.__book_stock
-    
-    def search_book(self,book_series) -> dict | str:
-            for bookstock in self.__book_stock:
-                if bookstock.name == book_series:
-                    return bookstock
-            return "Not Found"
             
     def get_book(self,book_series,bookname,activity_type) -> Book | None:
             for bookstock in self.__book_stock:
                 if bookstock.name == book_series:
-                    return bookstock.search_book_available(bookname,activity_type) 
+                    return bookstock.get_book_available(bookname,activity_type) 
             return None
-                
-    def search_area(self,customer,area_id) -> Area | None:
-        if not customer.check_eligibility():
-                raise PermissionError("Not come in to my place go away don't comeback")
+
+    def check_type_from_id(self,item_id:str) -> str:
+        if item_id.startswith("BK"):
+            return "Book"
+        elif item_id.startswith("AR"):
+            return "Area"
+        else:
+            raise ValueError("Invalid ID format")
         
-        for area in self.__area:
-            if area.id == area_id:
-                return area.list_timeslot()
+    def get_data_from_id(self,type_of_item:str,item_id:str):
+        if type_of_item == "Book":
+            parts = item_id.split("-")
+            activity_type = parts[1]
+            series = parts[2].replace("_"," ")
+            book_name = parts[3].replace("_"," ")
+            return activity_type,series,book_name
+        elif type_of_item == "Area":
+            pass
+        else:
+            raise ValueError("Invalid ID format")
+
+    def select(self,phonenumber : str,item_id : str,start_date : str,num_days : int) -> dict | str:
+        customer = Bibliohub.get_user_from_phone_number(phonenumber)
+        type_of_item = self.check_type_from_id(item_id)
+
+        if self.check_type_from_id(item_id) == "Book":
+            activity_type,series,book_name = self.get_data_from_id(type_of_item,item_id)
+
+            if activity_type == ActivityType.Rent.value:
+                if not customer.check_quota():
+                    raise HTTPException(
+                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                        detail="Quota การเช่าเกินกำหนดแล้ว"
+                    )
+
+            book = Bibliohub.get_book(series,book_name,activity_type)
+
+            if not book:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Book Not Found, Maybe checking your book id"
+                )
+            
+            customer.select(book)
+
+
+        respond = []
+
+        for selected in customer.get_selected_list:
+            if isinstance(selected,Book):
+                respond.append({
+                    "Book Name" : selected.book_info.name,
+                    "Book Series" : selected.book_info.book_stock.name,
+                    "Book Author" : selected.book_info.author,
+                    "Book Category" : selected.book_info.category.value,
+                    "Book Price" : selected.book_info.price,
+                    "Book Activity Type" : selected.book_info.activity_type.value,
+                    "Book Available Date" : selected.book_info.available_date,
+                    "Book Status" : selected.book_status,
+                    "Book UID" : selected.uid
+                })
+        print("Select Successful")
+        return {
+            "Customer Selected List" : respond
+        }
+
+    def select_book(self,phonenumber,book_id,start_date,num_day) -> Book | str:
+        customer = self.get_user_from_phone_number(phonenumber)
+        if not customer:
+            return "Customer not found"
+        
+        for bookstock in self.__book_stock:
+            for bookinfo in bookstock.get_book_list(ActivityType.Rent):
+                if bookinfo.id == book_id:
+                    book = bookinfo.search_book_available()
+                    if not book:
+                        return "Book not available"
+                    book.start_date = start_date
+                    book.calculate_end_date(num_day)
+                    return customer.select(book)
+        return "Book not found"
             
     def checkout(self,customer:Customer,staff:Staff,payment_method : MethodPayment):
         order = Order()
@@ -1070,89 +1137,10 @@ def get_all_book_series():
 def get_all_staff():
     return Bibliohub.get_staff_list
 
-@app.get("/search_book_by_series")
-def search_book_by_series(phonenumber:str,book_series:str):
-    customer = Bibliohub.get_user_from_phone_number(phonenumber)
-    if not isinstance(customer,Customer):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Not a customer, Please create customer first"
-        )
-    
-    if not customer.check_eligibility():
-        raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE,
-            detail="Don't come in to my place, Go away and don't comeback"
-        )
-    
-    respond = []
-
-    bookstock = Bibliohub.search_book(book_series)
-    respond.append({
-        "Book Series" : bookstock.name,
-        "Book For Sales" : [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Purchase)],
-        "Book For Rent": [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Rent)]
-    })
-    return {
-        "Book Result" : respond
-    }
-
 @app.get("/select")
 def select(phonenumber:str,item_id:str = Query(description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id"),start_date = date.today().strftime("%d/%m/%Y"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
-    customer = Bibliohub.get_user_from_phone_number(phonenumber)
-
-    all_id = item_id.split(",")
-
-    if len(all_id) < 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="โปรดใส่ id"
-        )
-    
-    for id in all_id:
-        if id.startswith("BK"):
-            parts = item_id.split("-")
-            activity_type = parts[1]
-            series = parts[2].replace("_"," ")
-            book_name = parts[3].replace("_"," ")
-
-            if activity_type == ActivityType.Rent.value:
-                if not customer.check_quota():
-                    raise HTTPException(
-                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
-                        detail="Quota การเช่าเกินกำหนดแล้ว"
-                    )
-
-            book = Bibliohub.get_book(series,book_name,activity_type)
-
-            if not book:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Book Not Found, Maybe checking your book id"
-                )
-            
-            customer.select(book)
-
-
-    respond = []
-
-    for selected in customer.get_selected_list:
-        if isinstance(selected,Book):
-            respond.append({
-                "Book Name" : selected.book_info.name,
-                "Book Series" : selected.book_info.book_stock.name,
-                "Book Author" : selected.book_info.author,
-                "Book Category" : selected.book_info.category.value,
-                "Book Price" : selected.book_info.price,
-                "Book Activity Type" : selected.book_info.activity_type.value,
-                "Book Available Date" : selected.book_info.available_date,
-                "Book Status" : selected.book_status,
-                "Book UID" : selected.uid
-            })
-    print("Select Successful")
-    return {
-        "Customer Selected List" : respond
-    }
+    Bibliohub.select(phonenumber,item_id,start_date,num_days)
+    return
 
 @app.get("/checkout")
 def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:MethodPayment = Query(description="วิธีการชำระเงิน")):
