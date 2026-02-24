@@ -1,41 +1,108 @@
 sequenceDiagram
     autonumber
-    actor NMB as NonMember
-    actor MB as Member
+    actor CS as Customer
     participant SYS as BiblioHubSystem
+    participant CSP as Customer
     participant BS as BookStock
     participant BI as BookInfo
     participant BK as Book
 
-    loop Search Book 
-        NMB ->> SYS: search_book(phonenumber,book_series)
-        activate SYS
-        activate NMB
-        SYS ->> SYS: get_user_from_phone_number(phonenumber)
-        SYS ->> NMB: check_eligibility()
-        NMB -->> SYS: return eligibility status : bool
-
-        alt eligibility successful
-            SYS ->> BS: get_name()
-            activate BS
-            BS -->> SYS: return name [String]
-            deactivate BS
-            SYS -->> NMB: return bookstock [object]
-        else eligibility unsuccessful
-            SYS -->> NMB: Don't come in to my place, Go away and don't comeback
-        end
-
-        deactivate SYS
-    end
+    CS ->> SYS: get_all_book_series() 
+    activate SYS
+    activate CS
+    SYS -->> CS: return book series list [list]
 
     loop Select Book
-        NMB ->> SYS: select_book(phonenumber,book_id,start_date,num_days)
-        activate SYS
+        CS ->> SYS: select_book(phonenumber,book_id,start_date,num_days)
         SYS ->> SYS: get_user_from_phone_number(phonenumber)
-        SYS ->> NMB: check_quota()
-        NMB -->> SYS: return quota status [bool]
-        deactivate NMB
+        NOTE over SYS: get_user_from_phone_number method
+        SYS ->> SYS: validate_phonenumber(phonenumber)
+
+        alt Invalid Phone Number Format
+            SYS -->> CS: return error message "Invalid phone number format"
+        end
+
+        alt Invalid Phone Number
+            SYS -->> CS: return error message "Invalid phone number"
+        else Valid Phone Number
+            loop customer in customer_list
+                SYS ->> CSP: get_phone_number():
+                CSP -->> SYS: return phone_number
+
+                alt phone_number found
+                    NOTE right of SYS: return customer object
+                else phone_number not found
+                    NOTE right of SYS: return error message "Phone number not found"
+                end
+            end
+            NOTE over SYS: end of get_user_from_phone_number method
+        end
+
+        SYS ->> SYS: check_type_from_id(item_id)
+
+        NOTE over SYS: check_type_from_id method
+        alt Invalid ID Format
+            SYS -->> CS: return error message "Invalid ID format"
+        else Valid ID Format
+            alt ID starts with "BK"
+                NOTE left of SYS: return "Book"
+            else ID starts with "AR"
+                NOTE left of SYS: return "Area"
+            else Invalid ID Prefix
+                SYS -->> CS: return error message "Invalid ID format"
+            end
+        end
+
+        NOTE over SYS: end of check_type_from_id method
+
+        SYS ->> SYS: get_data_from_id(item_id)
+        NOTE over SYS: get_data_from_id method
+
+        alt Type of Item is "Book"
+            NOTE left of SYS: return activity_type, series, book_name
+        else Type of Item is "Area"
+            NOTE left of SYS: return area information (if applicable)
+        else Invalid Type of Item
+            SYS -->> CS: return error message "Invalid ID format"
+        end
+
+        NOTE over SYS: end of get_data_from_id method
+
+        alt Activity Type is Rent
+            SYS ->> CSP: check_quota()
+            CSP -->> SYS: return quota status [bool]
+
+            alt Quota Not Available
+                SYS -->> CS: return error message "Quota not available"
+            end
+        end
+
         SYS ->> SYS: get_book(series,book_name,activity_type)
+        NOTE over SYS: get_book method
+        
+        loop bookstock in bookstock_list
+            SYS ->> BS: get_book_series()
+            BS -->> SYS: return book_series [string]
+            
+            alt series matches
+                SYS ->> BS: get_book_available(book_name,activity_type)
+                BS ->> BI: get_book_available()
+                BI -->> BS: return book_info [object]
+                BS -->> SYS: return book [object]
+
+                alt book found
+                    NOTE right of SYS: return book object
+                else book not found
+                    NOTE right of SYS: return error message "Book not found"
+                end
+            else series does not match
+                NOTE right of SYS: continue searching in next bookstock
+            end
+        end
+
+        NOTE over SYS: end of get_book method
+
+
         SYS ->> BS: search_book_available(bookname,activity_type)
         activate BS
         BS ->> BI: search_book_available()
@@ -44,122 +111,13 @@ sequenceDiagram
         deactivate BI
         BS -->> SYS: return book [object]
         deactivate BS
-        SYS ->> NMB: select(book)
-        activate NMB
-        NMB -->> SYS: return select successful
-        SYS -->> NMB: return select successful
+        SYS ->> CSP: select(book)
+        activate CSP
+        CSP -->> SYS: return select successful
+        SYS -->> CS: return select successful
         deactivate SYS
     end
 
-    NMB ->> SYS: checkout(customer,staff,payment_method)
-    deactivate NMB
-    activate SYS
-    create participant Order as Order
-    SYS ->> Order: create()
-    activate Order
-    Order -->> SYS: return order object [object]
-    deactivate Order
-
-    SYS ->> NMB: get_selected_list()
-    NMB -->> SYS: return selected_list [list]
-
-    alt is RentBook
-        create participant RB as RentBook
-        SYS ->> RB: create(book_rent_list)
-        activate RB
-        RB -->> SYS: return RentBook object [object]
-        deactivate RB
-        SYS ->> Order: set_rent_book(RentBook[object])
-        activate Order
-        Order -->> SYS: return set_rent_book successful
-        deactivate Order
-    else is PurchaseBook
-        create participant PB as PurchaseBook
-        SYS ->> PB: create(book_purchase_list)
-        activate PB
-        PB -->> SYS: return PurchaseBook object [object]
-        deactivate PB
-        SYS ->> Order: set_purchase_book(PurchaseBook[object])
-        activate Order
-        Order -->> SYS: return set_purchase_book successful
-        deactivate Order
-    end
-
-    create participant PMM as PaymentMethod
-    SYS ->> PMM: create(payment_method)
-    activate PMM
-    PMM -->> SYS: return PaymentMethod object [object]
-    deactivate PMM
-
-    create participant PM as Payment
-    SYS ->> PM: process_payment(customer,order,payment_method)
-    activate PM
-    PM -->> SYS: return payment status [bool]
-    deactivate PM
-    create participant TS as Transaction
-    SYS ->> TS: create(customer,staff,payment,datetime.now(),datetime.now())
-    activate TS
-    TS -->> SYS: return Transaction object [object]
-
-    SYS ->> TS: add_audit_log("Transaction requested")
-    TS -->> SYS: return add_audit_log successful
-    deactivate TS
-
-    SYS ->> PM: calculate_net_amount()
-    activate PM
-    PM -->> SYS: return net amount [float]
-    deactivate PM
-
-    SYS ->> PMM: process_payment()
-    activate PMM
-    PMM -->> SYS: return payment status [bool]
-    deactivate PMM
-
-    alt Payment successful
-        SYS ->> PM: update_payment_status("Paid")
-        activate PM
-        PM -->> SYS: return update_payment_status successful
-        deactivate PM
-        SYS ->> TS: update_transaction_status("Confirmed")
-        activate TS
-        TS -->> SYS: return successful
-        SYS ->> TS: add_audit_log("transaction completed")
-        TS -->> SYS: return add_audit_log successful
-        deactivate TS
-
-        SYS ->> Order: confirm()
-        activate Order
-        Order -->> SYS: return confirm successful
-        deactivate Order
-
-        SYS ->> SYS: notify_user()
-        create participant Notify as Notification
-        SYS ->> Notify: create(message,target_user)
-        activate Notify
-        Notify -->> SYS: return Notification [object]
-        SYS ->> Notify: send_message()
-        Notify -->> SYS: return Notification status [object]
-        deactivate Notify
-
-        SYS ->> NMB: add_transaction(Transaction[object])
-        activate NMB
-        NMB -->> SYS: return add_transaction status[bool]
-
-        SYS ->> NMB: add notify()
-        NMB -->> SYS: return notify successful
-
-        opt is Member
-            SYS ->> MB: add_point()
-            activate MB
-            MB -->> SYS: return add_point successful
-            deactivate MB
-        end
-        SYS -->> NMB: return checkout successful
-
-    else
-        SYS -->> NMB: return checkout unsuccessful
-        deactivate NMB
-        deactivate SYS
-    end
+    
 
 
