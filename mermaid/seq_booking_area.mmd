@@ -31,6 +31,8 @@ sequenceDiagram
 
     System-->>Customer: return {"area_id": area_id, "available_slots": available_slots}
     deactivate Customer
+
+    %% Select Area and Slot
     Customer->>System: select_area(phonenumber,area_id,List[slot_ids])
     activate Customer
     System->>System: get_user_from_phone_number(phonenumber)
