@@ -9,6 +9,10 @@ from contextlib import asynccontextmanager
 
 # Enum Class
 
+class ItemType(str, Enum):
+    Book = "Book"
+    Area = "Area"
+
 class BookingBookQuota(int, Enum):
     Silver = 6
     Gold = 8
@@ -40,6 +44,7 @@ class MethodPayment(str,Enum):
 class ActivityType(str, Enum):
     Rent = "Rent"
     Purchase = "Purchase"
+    All = "All"
 
 class TypeBook(str,Enum):
     Manga = "Manga"
@@ -238,8 +243,16 @@ class BookStock:
             return self.__rent_book_list
         elif activity_type.value == "Purchase":
             return self.__forsale_book_list
+        elif activity_type.value == "All":
+            return self.__rent_book_list, self.__forsale_book_list
         else:
             raise TypeError("Wrong Activity Type")
+
+    def get_book_info(self,bookname : str,activity_type : ActivityType):
+        for book_info in self.get_book_list(activity_type):
+            if book_info.name == bookname:
+                return book_info
+        return None
 
     def add_book_info(self,book_info:BookInfo,activity_type:ActivityType):
         if not isinstance(book_info,BookInfo):
@@ -336,11 +349,9 @@ class Customer:
     def check_quota(self): 
         return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.book_info.activity_type.value == "Rent"]) < (4 - self.__rental_quota)
 
-    def select(self,order : Book | Area) -> str | Book | Area:
-        if isinstance(order,(Book,Area)):
+    def select(self,order : BookInfo | Area) -> str | BookInfo | Area:
+        if isinstance(order,(BookInfo,Area)):
             self.__selected_list.append(order)
-            if isinstance(order,Book):
-                order.change_status(BookStatus.Selected)
             
             # Need implement Area
             """
@@ -803,7 +814,12 @@ class System:
     
     def get_all_book(self):
         return self.__book_stock
-            
+
+    def search_book_info_by_series(self,series : str,book_name : str,activity_type : ActivityType):
+        for bookstock in self.__book_stock:
+            if bookstock.name == series:
+                return bookstock.get_book_info(book_name,activity_type)
+    
     def get_book(self,book_series,bookname,activity_type) -> Book | None:
             for bookstock in self.__book_stock:
                 if bookstock.name == book_series:
@@ -834,62 +850,45 @@ class System:
         customer = Bibliohub.get_user_from_phone_number(phonenumber)
         type_of_item = self.check_type_from_id(item_id)
 
-        if self.check_type_from_id(item_id) == "Book":
+        if self.check_type_from_id(item_id) == ItemType.Book.value:
             activity_type,series,book_name = self.get_data_from_id(type_of_item,item_id)
 
             if activity_type == ActivityType.Rent.value:
+                activity_type = ActivityType.Rent
                 if not customer.check_quota():
                     raise HTTPException(
                         status_code=status.HTTP_406_NOT_ACCEPTABLE,
                         detail="Quota การเช่าเกินกำหนดแล้ว"
                     )
 
-            book = Bibliohub.get_book(series,book_name,activity_type)
+            book_info = Bibliohub.search_book_info_by_series(series,book_name,activity_type)
 
-            if not book:
+            if not book_info:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Book Not Found, Maybe checking your book id"
                 )
             
-            customer.select(book)
+            customer.select(book_info)
 
 
         respond = []
 
         for selected in customer.get_selected_list:
-            if isinstance(selected,Book):
+            if isinstance(selected,BookInfo):
                 respond.append({
-                    "Book Name" : selected.book_info.name,
-                    "Book Series" : selected.book_info.book_stock.name,
-                    "Book Author" : selected.book_info.author,
-                    "Book Category" : selected.book_info.category.value,
-                    "Book Price" : selected.book_info.price,
-                    "Book Activity Type" : selected.book_info.activity_type.value,
-                    "Book Available Date" : selected.book_info.available_date,
-                    "Book Status" : selected.book_status,
-                    "Book UID" : selected.uid
+                    "Book Name" : selected.name,
+                    "Book Series" : selected.book_stock.name,
+                    "Book Author" : selected.author,
+                    "Book Category" : selected.category.value,
+                    "Book Price" : selected.price,
+                    "Book Activity Type" : selected.activity_type.value,
+                    "Book Available Date" : selected.available_date
                 })
         print("Select Successful")
         return {
             "Customer Selected List" : respond
         }
-
-    def select_book(self,phonenumber,book_id,start_date,num_day) -> Book | str:
-        customer = self.get_user_from_phone_number(phonenumber)
-        if not customer:
-            return "Customer not found"
-        
-        for bookstock in self.__book_stock:
-            for bookinfo in bookstock.get_book_list(ActivityType.Rent):
-                if bookinfo.id == book_id:
-                    book = bookinfo.search_book_available()
-                    if not book:
-                        return "Book not available"
-                    book.start_date = start_date
-                    book.calculate_end_date(num_day)
-                    return customer.select(book)
-        return "Book not found"
             
     def checkout(self,customer:Customer,staff:Staff,payment_method : MethodPayment):
         order = Order()
@@ -901,8 +900,8 @@ class System:
         
         selected_list = customer.get_selected_list
 
-        rent_list = [selected for selected in selected_list if isinstance(selected, Book) and selected.book_info.activity_type.value == "Rent"]
-        purchase_list = [selected for selected in selected_list if isinstance(selected, Book) and selected.book_info.activity_type.value == "Purchase"]
+        rent_list = [selected.search_book_available() for selected in selected_list if isinstance(selected, BookInfo) and selected.activity_type.value == "Rent"]
+        purchase_list = [selected.search_book_available() for selected in selected_list if isinstance(selected, BookInfo) and selected.activity_type.value == "Purchase"]
 
         order.rent_book = RentBook(rent_list)
         order.purchase_book = Purchase(purchase_list)

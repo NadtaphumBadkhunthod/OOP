@@ -1,33 +1,49 @@
 sequenceDiagram
     autonumber
-    actor CS as Customer
+    actor Customer
     participant SYS as BiblioHubSystem
-    participant CSP as Customer
+    participant User
     participant BS as BookStock
     participant BI as BookInfo
     participant BK as Book
 
-    CS ->> SYS: get_all_book_series() 
-    activate SYS
-    activate CS
-    SYS -->> CS: return book series list [list]
+    Note over Customer: get all book in system
+    Customer ->>+ SYS: get_all_book_series() 
+    SYS -->>- Customer: return book series list [list]
+
+    Note over Customer: search bookinfo by series
+    Customer ->>+ SYS: search_book_by_series(book_series)
+    loop bookstock in bookstock_list
+        SYS ->>+ BS: get_book_series()
+        BS -->>- SYS: return book_series [string]
+
+        opt series matches
+            SYS ->>+ BS: get_book_list()
+            BS -->>- SYS: return book_forsale_list, book_rent_list [list]
+        end
+
+
+    end
+
+    SYS -->>- Customer: return book_forsale_list, book_rent_list [list]
 
     loop Select Book
-        CS ->> SYS: select_book(phonenumber,book_id,start_date,num_days)
+        Customer ->>+ SYS: select_book(phonenumber,book_id,start_date,num_days)
+        
         SYS ->> SYS: get_user_from_phone_number(phonenumber)
         NOTE over SYS: get_user_from_phone_number method
         SYS ->> SYS: validate_phonenumber(phonenumber)
 
-        alt Invalid Phone Number Format
-            SYS -->> CS: return error message "Invalid phone number format"
+        opt Invalid Phone Number Format
+            SYS -->> Customer: return error message "Invalid phone number format"
         end
 
         alt Invalid Phone Number
-            SYS -->> CS: return error message "Invalid phone number"
+            SYS -->> Customer: return error message "Invalid phone number"
         else Valid Phone Number
             loop customer in customer_list
-                SYS ->> CSP: get_phone_number():
-                CSP -->> SYS: return phone_number
+                SYS ->>+ User: get_phone_number():
+                User -->>- SYS: return phone_number
 
                 alt phone_number found
                     NOTE right of SYS: return customer object
@@ -42,14 +58,14 @@ sequenceDiagram
 
         NOTE over SYS: check_type_from_id method
         alt Invalid ID Format
-            SYS -->> CS: return error message "Invalid ID format"
+            SYS -->> Customer: return error message "Invalid ID format"
         else Valid ID Format
             alt ID starts with "BK"
                 NOTE left of SYS: return "Book"
             else ID starts with "AR"
                 NOTE left of SYS: return "Area"
             else Invalid ID Prefix
-                SYS -->> CS: return error message "Invalid ID format"
+                SYS -->> Customer: return error message "Invalid ID format"
             end
         end
 
@@ -63,17 +79,17 @@ sequenceDiagram
         else Type of Item is "Area"
             NOTE left of SYS: return area information (if applicable)
         else Invalid Type of Item
-            SYS -->> CS: return error message "Invalid ID format"
+            SYS -->> Customer: return error message "Invalid ID format"
         end
 
         NOTE over SYS: end of get_data_from_id method
 
         alt Activity Type is Rent
-            SYS ->> CSP: check_quota()
-            CSP -->> SYS: return quota status [bool]
+            SYS ->>+ User: check_quota()
+            User -->>- SYS: return quota status [bool]
 
             alt Quota Not Available
-                SYS -->> CS: return error message "Quota not available"
+                SYS -->> Customer: return error message "Quota not available"
             end
         end
 
@@ -81,14 +97,14 @@ sequenceDiagram
         NOTE over SYS: get_book method
         
         loop bookstock in bookstock_list
-            SYS ->> BS: get_book_series()
-            BS -->> SYS: return book_series [string]
+            SYS ->>+ BS: get_book_series()
+            BS -->>- SYS: return book_series [string]
             
             alt series matches
-                SYS ->> BS: get_book_available(book_name,activity_type)
-                BS ->> BI: get_book_available()
-                BI -->> BS: return book_info [object]
-                BS -->> SYS: return book [object]
+                SYS ->>+ BS: get_book_available(book_name,activity_type)
+                BS ->>+ BI: get_book_available()
+                BI -->>- BS: return book_info [object]
+                BS -->>- SYS: return book [object]
 
                 alt book found
                     NOTE right of SYS: return book object
@@ -102,20 +118,13 @@ sequenceDiagram
 
         NOTE over SYS: end of get_book method
 
-
-        SYS ->> BS: search_book_available(bookname,activity_type)
-        activate BS
-        BS ->> BI: search_book_available()
-        activate BI
-        BI -->> BS: return book_info [object]
-        deactivate BI
-        BS -->> SYS: return book [object]
-        deactivate BS
-        SYS ->> CSP: select(book)
-        activate CSP
-        CSP -->> SYS: return select successful
-        SYS -->> CS: return select successful
-        deactivate SYS
+        SYS ->>+ BS: search_book_available(bookname,activity_type)
+        BS ->>+ BI: search_book_available()
+        BI -->>- BS: return book_info [object]
+        BS -->>- SYS: return book [object]
+        SYS ->>+ User: select(book)
+        User -->>- SYS: return select successful
+        SYS -->> Customer: return select successful
     end
 
     

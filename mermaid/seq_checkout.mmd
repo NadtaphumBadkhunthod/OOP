@@ -1,7 +1,9 @@
 sequenceDiagram
-    participant NMB as NonMember
+    autonumber
+    actor Customer as Customer
+    participant CS as Customer
     participant SYS as BiblioHubSystem
-    NMB ->> SYS: checkout(customer,staff,payment_method)
+    Customer ->> SYS: checkout(phonenumber,staff,payment_method)
     activate SYS
     create participant Order as Order
     SYS ->> Order: create()
@@ -9,8 +11,8 @@ sequenceDiagram
     Order -->> SYS: return order object [object]
     deactivate Order
 
-    SYS ->> NMB: get_selected_list()
-    NMB -->> SYS: return selected_list [list]
+    SYS ->> CS: get_selected_list()
+    CS -->> SYS: return selected_list [list]
 
     alt is RentBook
         create participant RB as RentBook
@@ -41,12 +43,12 @@ sequenceDiagram
     deactivate PMM
 
     create participant PM as Payment
-    SYS ->> PM: process_payment(customer,order,payment_method)
+    SYS ->> PM: process_payment(CS,order,payment_method)
     activate PM
     PM -->> SYS: return payment status [bool]
     deactivate PM
     create participant TS as Transaction
-    SYS ->> TS: create(customer,staff,payment,datetime.now(),datetime.now())
+    SYS ->> TS: create(CS,staff,payment,datetime.now(),datetime.now())
     activate TS
     TS -->> SYS: return Transaction object [object]
 
@@ -81,7 +83,7 @@ sequenceDiagram
         Order -->> SYS: return confirm successful
         deactivate Order
 
-        SYS ->> SYS: notify_user(customer,message)
+        SYS ->> SYS: notify_user(CS,message)
         create participant Notify as Notification
         SYS ->> Notify: create(message,target_user)
         activate Notify
@@ -90,23 +92,23 @@ sequenceDiagram
         Notify -->> SYS: return Notification status [object]
         deactivate Notify
 
-        SYS ->> NMB: add_transaction(Transaction[object])
-        activate NMB
-        NMB -->> SYS: return add_transaction status[bool]
+        SYS ->> CS: add_transaction(Transaction[object])
+        activate CS
+        CS -->> SYS: return add_transaction status[bool]
 
-        SYS ->> NMB: add notify()
-        NMB -->> SYS: return notify successful
+        SYS ->> CS: add notify()
+        CS -->> SYS: return notify successful
 
         opt is Member
-            SYS ->> NMB: add_point()
-            activate NMB
+            SYS ->> CS: add_point()
+            activate CS
             MB -->> SYS: return add_point successful
-            deactivate NMB
+            deactivate CS
         end
-        SYS -->> NMB: return checkout successful
+        SYS -->> CS: return checkout successful
 
     else
-        SYS -->> NMB: return checkout unsuccessful
-        deactivate NMB
+        SYS -->> CS: return checkout unsuccessful
+        deactivate CS
         deactivate SYS
     end

@@ -2,70 +2,64 @@ sequenceDiagram
     autonumber
     actor Customer as Member / NonMember
     participant System as BiblioHubSystem
+    participant Customers as Customer
+    
     participant AreaObj as Area
-    
-    participant Slot as TimeSlot
-    
-    participant PayObj as Payment
-    
+    participant Slot as TimeSlot    
 
-    Customer->>System: search_area()
-    System->>AreaObj: list_timeslot()
-    
-    loop  TimeSlot ใน Area นั้น
-        AreaObj->>Slot: check is_available
-        Slot-->>AreaObj: return status
+    Customer->>System: search_area(phonenumber,area_id)
+    activate Customer
+    loop check_eligibility ใน Customers
+        System->>Customers: check_eligibility(phonenumber)
+        activate System
+        Customers-->>System: return ประวัติดี
+        deactivate System
     end
-    
-    AreaObj-->>System: return available_slots
-    System-->>Customer: show available areas & slots
-
-    System->>Customer: check_eligibility()
-    Customer-->>System: return ประวัติดี
-
-    Customer->>System: select_area()
-    System-->>Customer: return Select Sucess
-    System->>Customer: check_quota()
-    Customer-->>System: return quota
-    System->>System:validate_booking_conflict()
-    Customer->>System: checkout()
-    create participant BArea as BookingArea
-    System->>BArea:create_booking_area()
-    BArea -->>System:return booking_area_obj
-    opt เข้าเงื่อนไข Promotion (เช่น วันเกิด/Double Date)
-        System->>System: apply_discount(Promotion)
-    end
-    
-    alt สิทธิ์ผ่าน และ พื้นที่ว่าง (Success Case)
-        System->>PayObj: calculate_net_amount()
-        PayObj-->>System: return net_amount
-        System->>PayObj: process_payment()
-        PayObj-->>System: return payment_confirmed
-
-        create participant Transac as Transaction
-        System->>Transac: create_transaction()
-        Transac-->>System:return Create Success
-        System->>Transac: add_audit_log()
-        Transac-->>System: return Success
-        System->>Transac: update_status("Confirmed")
-        Transac-->>System:return Update Success
-        
-        
-        loop ทุกๆ Slot ที่จอง (รวมที่อัปเกรดแล้ว)
-            System->>Slot: update_slot(is_available=False)
-            Slot-->>System: return Update Success
+    loop ค้นหา Timeslot ใน area
+        System->>AreaObj: list_timeslot(area_id)
+        activate System
+        loop  TimeSlot ใน Area ว่าว่างหรือไม่
+            AreaObj->>Slot: check is_available
+            activate AreaObj
+            Slot-->>AreaObj: return status
+            deactivate AreaObj
         end
-        System->>Customer:add_transaction()
-        Customer-->>System:return add_success
-        System->>System:notify_user()
-        create participant Notify as Notification
-        System->>Notify: create_notify()
-        Notify-->>System: return notify obj
-        System->>Notify: send_message("Booking Success")
-        Notify-->>System: return send Success
-        System->>Customer:add_notify()
-        Customer-->>System: return add success
-        System-->>Customer: return เสร็จสิ้นการทำรายการ
+        AreaObj-->>System: return available_slots
+        deactivate System
+        
+    end
+
+    System-->>Customer: return {"area_id": area_id, "available_slots": available_slots}
+    deactivate Customer
+    Customer->>System: select_area(phonenumber,area_id,List[slot_ids])
+    activate Customer
+    System->>System: get_user_from_phone_number(phonenumber)
+    System->>Customers: check_quota(phonenumber)
+    activate System
+    alt โควต้าผ่าน (Success Case)
+        Customers-->>System: return quota[True]
+        deactivate System
+        System-->>Customer: return {"status": "Success", "message": f"นำสล็อต {slot_names} ของ {area_id.value} ใส่ตะกร้าแล้ว"}
+        deactivate Customer
     else สิทธิ์ไม่ผ่าน หรือ มีการจองซ้อน (Failure Case)
-        System-->>Customer: notify_error("Booking Failed")
+        System-->>Customer: return {"error": f"โควต้าเต็ม! คุณจองได้อีก {customer.get_area_quota() - customer.booking_reservation_time} ชม."}
+        
+    end
+    Customer->>System: checkout_area(phonenumber,payment_method)
+    activate Customer
+    loop เช็คว่ามี Area ใน attribute selected_list ในตัว customer
+        alt มี area ใน customer (Success Case)
+            create participant BArea as BookingArea
+            System->>BArea:create_booking_area(all_slots, the_room)
+            activate System
+            BArea -->>System:return booking_area_obj
+            deactivate System
+            System->>System:checkout(customer, Staff(), [booking_order], payment_method)
+            activate System
+            deactivate System
+            System-->>Customer:return ทำรายการสำเร็จ ชำระเงินรวมทั้งสิ้น net_amount บาท
+            deactivate Customer
+        else ไม่มี area ใน customer (Failure Case)
+            System-->>Customer: return ไม่มีรายการจองที่นั่ง
+        end
     end
