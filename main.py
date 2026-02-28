@@ -378,8 +378,10 @@ class Customer:
     def check_quota(self): 
         return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) < (4 - self.__rental_quota)
 
-    def select(self,order : BookOrder | Area) -> str | BookInfo | Area:
-        if isinstance(order,(BookOrder,Area)):
+    def select(self,order : BookInfo | Area,num_days : int = 0) -> str | BookInfo | Area:
+        if isinstance(order,(BookInfo,Area)):
+            if isinstance(order,BookInfo):
+                order = BookOrder(order,num_days)
             self.__selected_list.append(order)
 
             return order
@@ -959,7 +961,7 @@ class System:
                     detail="Book Not Found, Maybe checking your book id"
                 )
             
-            customer.select(BookOrder(book_info,num_days))
+            customer.select(book_info,num_days)
 
 
         respond = []
