@@ -768,10 +768,16 @@ class System:
         """
 
         if (not (self.validate_name_and_surname(name,surname) and self.validate_email(email) and self.validate_phonenumber(phonenumber))):
-            return "Input not in a right form"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Validation Fail"
+            )
         
         if (self.check_duplicate_account(phonenumber)):
-            return "Account duplicated"
+            return HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account Duplicate"
+            )
         
         member = Member(name,surname,phonenumber,email)
         self.__customer_list.append(member)
