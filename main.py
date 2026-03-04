@@ -8,6 +8,13 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 # Enum Class
+class CustomerStatus(str, Enum):
+    Expired = "Expired"
+    Good = "Good"
+
+class ItemType(str, Enum):
+    Book = "Book"
+    Area = "Area"
 
 class BookingBookQuota(int, Enum):
     Silver = 6
@@ -40,6 +47,7 @@ class MethodPayment(str,Enum):
 class ActivityType(str, Enum):
     Rent = "Rent"
     Purchase = "Purchase"
+    All = "All"
 
 class TypeBook(str,Enum):
     Manga = "Manga"
@@ -52,7 +60,7 @@ class TypeBook(str,Enum):
 class BookStatus(str,Enum):
     Available = "Available"
     UnAvailable = "UnAvailable"
-    Selected = "Selected"
+    InProcess = "InProcess"
     Purchased = "Purchased"
     Incoming = "Incoming"
 
@@ -86,7 +94,6 @@ class Book:
         """
         self.__book_info = book_info
         self.__book_uid = None
-        self.__borrowed_count = 0
         self.__book_status = status
         self.__start_date = None 
         self.__end_date = None
@@ -119,26 +126,21 @@ class Book:
     @property
     def start_date(self):
         return self.__start_date
-    
-    @start_date.setter
-    def start_date(self,date : date):
-        self.__start_date = date
 
     @property
     def end_date(self):
         return self.__end_date
     
-    def calculate_end_date(self,how_many_days : int):
-        self.__end_date = self.__start_date + timedelta(days=how_many_days)
+    def calculate_end_date(self,num_days):
+        self.__start_date = datetime.now()
+        self.__end_date = self.__start_date + timedelta(days=num_days)
+        return self
 
     def check_available(self):
         return self.__book_status == BookStatus.Available.value
     
     def change_status(self,status:BookStatus):
-        self.__book_status = status.value
-    
-    def change_activity_type(self,activity_type:ActivityType):
-        self.__activity_type = activity_type
+        self.__book_status = status
 
 class BookInfo:
     def __init__(self,book_stock : BookStock,name,author,category:TypeBook,price,activity_type : ActivityType,available_date=date.today()):
@@ -213,10 +215,37 @@ class BookInfo:
             book.uid = f"{self.__id}-{len(self.__book)}"
             self.__book.append(book)
 
+    def get_nums_available(self):
+        count = 0
+        for book in self.__book:
+            if book.check_available():
+                count += 1
+
+        return count
+
     def search_book_available(self):
         for book in self.__book:
             if book.check_available():
+                book.change_status(BookStatus.InProcess)
                 return book
+            
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="หนังสือมีจำนวนไม่พอ"
+        )
+    
+class BookOrder:
+    def __init__(self,book_info : BookInfo,nums_date):
+        self.__book_info : BookInfo = book_info
+        self.__nums_date = nums_date
+
+    @property
+    def book_info(self):
+        return self.__book_info
+    
+    @property
+    def nums_date(self):
+        return self.__nums_date
 
 class BookStock:
     def __init__(self,name):
@@ -238,8 +267,19 @@ class BookStock:
             return self.__rent_book_list
         elif activity_type.value == "Purchase":
             return self.__forsale_book_list
+        elif activity_type.value == "All":
+            return self.__rent_book_list, self.__forsale_book_list
         else:
             raise TypeError("Wrong Activity Type")
+
+    def get_book_info_by_name(self,bookname : str,author : str,activity_type : ActivityType):
+        for book_info in self.get_book_list(activity_type):
+            if book_info.name == bookname and book_info.author == author:
+                return book_info
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book name or Author Not Found"
+        )
 
     def add_book_info(self,book_info:BookInfo,activity_type:ActivityType):
         if not isinstance(book_info,BookInfo):
@@ -270,7 +310,7 @@ class BookStock:
         else:
             raise TypeError("Need to be a book")
         
-    def search_book_available(self,bookname,activity_type):
+    def get_book_available(self,bookname,activity_type):
         if activity_type == "Rent":
             target_list = self.__rent_book_list
         elif activity_type == "Purchase":
@@ -301,10 +341,12 @@ class Customer:
         self.__email = email
         self.__transaction : list[Transaction] = []
         self.__notification_list : list[Notification] = []
-        self.__booking_reservation_time = None
         self.__rental_quota = 0
         self.__strike = 0
         self.__selected_list : list[Book,Area] = []
+
+    def set_rental_quota(self,nums_rent):
+        self.__rental_quota += nums_rent
 
     @property
     def get_all_transaction(self) -> list[Transaction]:
@@ -334,19 +376,13 @@ class Customer:
         return self.__strike < 3
     
     def check_quota(self): 
-        return len([selected for selected in self.__selected_list if isinstance(selected,Book) and selected.book_info.activity_type.value == "Rent"]) < (4 - self.__rental_quota)
+        return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) < (4 - self.__rental_quota)
 
-    def select(self,order : Book | Area) -> str | Book | Area:
-        if isinstance(order,(Book,Area)):
+    def select(self,order : BookInfo | Area,num_days : int = 0) -> str | BookInfo | Area:
+        if isinstance(order,(BookInfo,Area)):
+            if isinstance(order,BookInfo):
+                order = BookOrder(order,num_days)
             self.__selected_list.append(order)
-            if isinstance(order,Book):
-                order.change_status(BookStatus.Selected)
-            
-            # Need implement Area
-            """
-            if isinstance(order,Area):
-                return order.something(Status.Selected)
-            """
 
             return order
         return "Not Found"
@@ -358,6 +394,7 @@ class Customer:
     def add_transaction(self,transaction):
         if isinstance(transaction,Transaction):
             self.__transaction.append(transaction)
+            self.__selected_list = []
 
 class Member(Customer):
     def __init__(self, name, surname, phonenumber, email, birth_month : BirthMonth):
@@ -367,13 +404,34 @@ class Member(Customer):
         self.__birth_month = birth_month
         self.__points = 0
         self.__booking_book_quota = BookingBookQuota.Silver
+        self.__status = CustomerStatus.Good
         try:
             self.__expiration_date = date.today().replace(year=date.today().year + 1)
         except:
             self.__expiration_date = date.today().replace(year=date.today().year + 1,month=3, day=1)
+
+    @property
+    def level_member(self):
+        return self.__level_member
+
+    @property
+    def birth_month(self):
+        return self.__birth_month
+
+    @property
+    def check_status(self):
+        if datetime.now() > self.__expiration_date:
+            self.__status = CustomerStatus.Expired
+        
+        return self.__status
     
     def add_point(self):
         self.__points += 1
+
+        if self.__points >= 30:
+            self.__level_member = LevelMember.Gold
+        elif self.__points >= 100:
+            self.__level_member = LevelMember.Platinum
 
 class Staff(Member):
     count = 0
@@ -440,7 +498,7 @@ class Order:
     @property
     def info(self):
         def format_book(book : Book):
-            return {
+            result = {
                 "Book Name" : book.book_info.name,
                 "Book Series" : book.book_info.book_stock.name,
                 "Book Author" : book.book_info.author,
@@ -451,8 +509,13 @@ class Order:
                 "Book Status" : book.book_status,
                 "Book UID" : book.uid
             }
-        rent_book_info = [format_book(rent_book) for rent_book in self.__rent_book.get_order]
-        return {"Rent Book" : rent_book_info}
+
+            if book.book_info.activity_type == ActivityType.Rent:
+                result["Start Date"] = book.start_date
+                result["End Date"] = book.end_date
+            return result
+        order_info = [format_book(rent_book) for rent_book in (self.__rent_book.get_order + self.__purchase_book.get_order)]
+        return {"Order Info" : order_info}
 
     @property
     def rent_book(self):
@@ -537,11 +600,11 @@ class QRCode(PaymentMethod):
 
 class Payment:
     count = 0
-    def __init__(self,customer : Customer,order : Order,payment_method : PaymentMethod):
+    def __init__(self,customer : Customer,payment_method : PaymentMethod):
         self.__customer = customer
         self.__payment_no = f"PYM-{Payment.count}"
         self.__status = PaymentStatus.Unpaid.value
-        self.__order : Order = order
+        self.__order : Order = Order()
         self.__timestamp = datetime.now()
         self.__payment_method = payment_method
         self.__base_fee = 10 # เท่าไหร่อ่ะ need implement
@@ -599,17 +662,20 @@ class Payment:
     def update_payment_status(self,status:PaymentStatus):
         self.__status = status.value
 
+        if status == PaymentStatus.Paid:
+            self.__order.confirm()
+
     def add_penalty_fee(self,penalty_fee):
         self.__penalty_fee += penalty_fee
 
 class Transaction:
-    def __init__(self,customer:Customer,staff:Staff,payment : Payment,start_date_time : datetime = datetime.now(), end_date_time : datetime = datetime.now()):
+    def __init__(self,customer:Customer,staff:Staff,payment_method : {QRCode,Cash},start_date_time : datetime = datetime.now(), end_date_time : datetime = datetime.now()):
         self.__customer = customer
         self.__staff = staff
         self.__start_date_time = start_date_time
         self.__end_date_time = end_date_time
         self.__status = TransactionStatus.Requested.value
-        self.__payment = payment
+        self.__payment = Payment(customer,payment_method)
         self.__audit_logs_list = []
 
     @property
@@ -639,9 +705,33 @@ class Transaction:
     @property
     def audit_logs(self):
         return self.__audit_logs_list
+    
+    @property
+    def order(self):
+        return self.__payment.order
+    
+    @order.setter
+    def order(self,order : {RentBook,Purchase}):
+        if isinstance(order,RentBook):
+            self.__payment.order.rent_book = order
+        elif isinstance(order,Purchase):
+            self.__payment.order.purchase_book = order
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="activity type not found"
+            )
+        
+    def get_net_amount(self):
+        return self.__payment.calculate_net_amount()
 
     def update_status(self,status:TransactionStatus):
         self.__status = status.value
+
+        if status == TransactionStatus.Confirm:
+            self.__customer.add_transaction(self)
+            self.__payment.update_payment_status(PaymentStatus.Paid)
+
 
     def add_audit_log(self,log):
         self.__audit_logs_list.append(log)
@@ -804,71 +894,139 @@ class System:
     def get_all_book(self):
         return self.__book_stock
     
-    def search_book(self,book_series) -> dict | str:
-            for bookstock in self.__book_stock:
-                if bookstock.name == book_series:
-                    return bookstock
-            return "Not Found"
-            
+    def search_book_by_series(self,series):
+        for bookstock in self.__book_stock:
+            if bookstock.name == series:
+                return bookstock.get_book_list(ActivityType.All)
+
+    def get_book_info(self,series : str,book_name : str,author : str,activity_type : ActivityType) -> BookInfo:
+        for bookstock in self.__book_stock:
+            if bookstock.name == series:
+                return bookstock.get_book_info_by_name(book_name,author,activity_type)
+        
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book Series Not Found"
+        )
+    
     def get_book(self,book_series,bookname,activity_type) -> Book | None:
             for bookstock in self.__book_stock:
                 if bookstock.name == book_series:
-                    return bookstock.search_book_available(bookname,activity_type) 
+                    return bookstock.get_book_available(bookname,activity_type) 
             return None
-                
-    def search_area(self,customer,area_id) -> Area | None:
-        if not customer.check_eligibility():
-                raise PermissionError("Not come in to my place go away don't comeback")
+
+    def check_type_from_id(self,item_id:str) -> str:
+        if item_id.startswith("BK"):
+            return ItemType.Book
+        elif item_id.startswith("AR"):
+            return ItemType.Area
+        else:
+            raise ValueError("Invalid ID format")
         
-        for area in self.__area:
-            if area.id == area_id:
-                return area.list_timeslot()
+    def get_data_from_id(self,type_of_item:str,item_id:str):
+        if type_of_item == "Book":
+            parts = item_id.split("-")
+            activity_type = parts[1]
+            series = parts[2].replace("_"," ")
+            book_name = parts[3].replace("_"," ")
+            author = parts[4].replace("_"," ")
+            return activity_type,series,book_name,author
+        elif type_of_item == "Area":
+            pass
+        else:
+            raise ValueError("Invalid ID format")
+
+    def select(self,phonenumber : str,item_id : str,num_days : int) -> dict | str:
+        customer = Bibliohub.get_user_from_phone_number(phonenumber)
+        type_of_item = self.check_type_from_id(item_id)
+
+        if self.check_type_from_id(item_id) == ItemType.Book:
+            activity_type,series,book_name,author = self.get_data_from_id(type_of_item,item_id)
+
+            if activity_type == ActivityType.Rent.value:
+                activity_type = ActivityType.Rent
+                if not customer.check_quota():
+                    raise HTTPException(
+                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                        detail="Quota การเช่าเกินกำหนดแล้ว"
+                    )
+            elif activity_type == ActivityType.Purchase.value:
+                activity_type = ActivityType.Purchase
+
+            book_info = Bibliohub.get_book_info(series,book_name,author,activity_type)
+
+            if not book_info:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Book Not Found, Maybe checking your book id"
+                )
+            
+            customer.select(book_info,num_days)
+
+
+        respond = []
+
+        for selected in customer.get_selected_list:
+            if isinstance(selected,BookOrder):
+                respond.append({
+                    "Book Name" : selected.book_info.name,
+                    "Book Series" : selected.book_info.book_stock.name,
+                    "Book Author" : selected.book_info.author,
+                    "Book Category" : selected.book_info.category.value,
+                    "Book Price" : selected.book_info.price,
+                    "Book Activity Type" : selected.book_info.activity_type.value,
+                    "Book Available Date" : selected.book_info.available_date
+                })
+        print("Select Successful")
+        return {
+            "Customer Selected List" : respond
+        }
             
     def checkout(self,customer:Customer,staff:Staff,payment_method : MethodPayment):
-        order = Order()
         rent_list = []
         purchase_list = []
 
         if not isinstance(customer,Customer):
             return "Not a customer"
         
-        selected_list = customer.get_selected_list
-
-        rent_list = [selected for selected in selected_list if isinstance(selected, Book) and selected.book_info.activity_type.value == "Rent"]
-        purchase_list = [selected for selected in selected_list if isinstance(selected, Book) and selected.book_info.activity_type.value == "Purchase"]
-
-        order.rent_book = RentBook(rent_list)
-        order.purchase_book = Purchase(purchase_list)
-
         if payment_method == MethodPayment.cash:
-            payment_method = Cash()
+            payment_method : Cash = Cash()
         elif payment_method == MethodPayment.qrcode:
-            payment_method = QRCode(customer.phonenumber)
+            payment_method : QRCode = QRCode(customer.phonenumber)
         else:
             raise TypeError("Method Payment error")
-        payment = Payment(customer,order,payment_method)
-        transaction = Transaction(customer,staff,payment,datetime.now(),datetime.now())
+        
+        if len(customer.get_selected_list) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No Order"
+            )
+
+        rent_list = [selected.book_info.search_book_available().calculate_end_date(selected.nums_date) for selected in customer.get_selected_list if isinstance(selected, BookOrder) and selected.book_info.activity_type.value == "Rent"]
+        purchase_list = [selected.book_info.search_book_available() for selected in customer.get_selected_list if isinstance(selected, BookOrder) and selected.book_info.activity_type.value == "Purchase"]
+
+        transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
+        transaction.order = RentBook(rent_list)
+        transaction.order = Purchase(purchase_list)
 
         transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime("%d/%m/%Y, %H:%M:%S")}") #need implement : เพิ่มรูปแบบของ audit log
-        net_amount = payment.payment_method.process_payment(payment.calculate_net_amount()) #need implement : calculate payment ใน payment ไปเลย
-        print(net_amount)
+        result = payment_method.process_payment(transaction.get_net_amount()) #need implement : calculate payment ใน payment ไปเลย
+        print(result)
 
-        payment.update_payment_status(PaymentStatus.Paid)
+        if len(rent_list) > 0:
+            customer.set_rental_quota(len(rent_list))   
         transaction.update_status(TransactionStatus.Confirm)
         transaction.add_audit_log(f"transaction completed : {datetime.now().strftime("%d/%m/%Y, %H:%M:%S")}")
 
         # ส่วนท้ายการทำงาน need implement : ถ้ารายการไหนต้อง update status ของสินค้ามาทำในส่วนนี้
-        order.confirm()
-
         self.__transaction_list.append(transaction)
-        customer.add_transaction(transaction)
 
         self.notify_user(customer,f"{customer.name}: transaction ... confirm") #need implement : ต้องเปลี่ยนคำ
 
         if isinstance(customer,Member):
             customer.add_point()
+            self.notify_user(customer,f"{customer.name}: add point successful")
 
-        self.notify_user(customer,f"{customer.name}: add point successful")
         print("Checkout Successful")
         return transaction
     
@@ -991,24 +1149,24 @@ async def lifespan(app: FastAPI):
     # Create_Book
     create_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,1,date.today().strftime("%d/%m/%Y"))
     create_book("How to learn OOP 2","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,2,date.today().strftime("%d/%m/%Y"))
+    create_book("How to learn OOP 2","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Purchase,2,date.today().strftime("%d/%m/%Y"))
     create_book("IDK","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,1,date.today().strftime("%d/%m/%Y"))
     create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,date.today().strftime("%d/%m/%Y"))
 
     # Add Copies
     create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,date.today().strftime("%d/%m/%Y"))
-
-    select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-0",date.today().strftime("%d/%m/%Y"),1)
-    select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-1",date.today().strftime("%d/%m/%Y"),1)
+    create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Purchase,10,date.today().strftime("%d/%m/%Y"))
 
     try:
-        select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax-2",date.today().strftime("%d/%m/%Y"),1)
+        select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsa",1)
+        print("What is wrong")
     except HTTPException as e:
         print(f"Pass error ID Not Found : Expect 404({e})")
         
-    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
-    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
+    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",1)
+    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",1)
     try:
-        select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",date.today().strftime("%d/%m/%Y"),1)
+        select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",1)
     except HTTPException as e:
         print(f"Pass error เช่าเกิน : Expect 406 ({e})")
 
@@ -1048,7 +1206,8 @@ def format_book_info(book : BookInfo):
     return {
         "Book Name": book.name,
         "Book ID": book.id,
-        "Book Copies": book.copies
+        "Book Copies": book.copies,
+        "book available : " : book.get_nums_available()
     }
 
 @app.get("/get_all_book_series")
@@ -1071,88 +1230,30 @@ def get_all_staff():
     return Bibliohub.get_staff_list
 
 @app.get("/search_book_by_series")
-def search_book_by_series(phonenumber:str,book_series:str):
-    customer = Bibliohub.get_user_from_phone_number(phonenumber)
-    if not isinstance(customer,Customer):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Not a customer, Please create customer first"
-        )
+def search_book_by_series(series : str):
+    result : tuple[list[BookInfo],list[BookInfo]] = Bibliohub.search_book_by_series(series)
     
-    if not customer.check_eligibility():
-        raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE,
-            detail="Don't come in to my place, Go away and don't comeback"
-        )
+    if not result:
+        return "Series Not Found"
     
-    respond = []
+    book_for_rent, book_for_sales = result
 
-    bookstock = Bibliohub.search_book(book_series)
-    respond.append({
-        "Book Series" : bookstock.name,
-        "Book For Sales" : [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Purchase)],
-        "Book For Rent": [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Rent)]
-    })
     return {
-        "Book Result" : respond
+        "Book for rent" : [{
+            "name : " : book.name,
+            "book id : " : book.id,
+            "book available : " : book.get_nums_available()
+        } for book in book_for_rent],
+        "Book for sales" : [{
+            "name : " : book.name,
+            "book id : " : book.id,
+            "book available : " : book.get_nums_available()
+        } for book in book_for_sales]
     }
 
 @app.get("/select")
-def select(phonenumber:str,item_id:str = Query(description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id"),start_date = date.today().strftime("%d/%m/%Y"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
-    customer = Bibliohub.get_user_from_phone_number(phonenumber)
-
-    all_id = item_id.split(",")
-
-    if len(all_id) < 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="โปรดใส่ id"
-        )
-    
-    for id in all_id:
-        if id.startswith("BK"):
-            parts = item_id.split("-")
-            activity_type = parts[1]
-            series = parts[2].replace("_"," ")
-            book_name = parts[3].replace("_"," ")
-
-            if activity_type == ActivityType.Rent.value:
-                if not customer.check_quota():
-                    raise HTTPException(
-                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
-                        detail="Quota การเช่าเกินกำหนดแล้ว"
-                    )
-
-            book = Bibliohub.get_book(series,book_name,activity_type)
-
-            if not book:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Book Not Found, Maybe checking your book id"
-                )
-            
-            customer.select(book)
-
-
-    respond = []
-
-    for selected in customer.get_selected_list:
-        if isinstance(selected,Book):
-            respond.append({
-                "Book Name" : selected.book_info.name,
-                "Book Series" : selected.book_info.book_stock.name,
-                "Book Author" : selected.book_info.author,
-                "Book Category" : selected.book_info.category.value,
-                "Book Price" : selected.book_info.price,
-                "Book Activity Type" : selected.book_info.activity_type.value,
-                "Book Available Date" : selected.book_info.available_date,
-                "Book Status" : selected.book_status,
-                "Book UID" : selected.uid
-            })
-    print("Select Successful")
-    return {
-        "Customer Selected List" : respond
-    }
+def select(phonenumber:str,item_id:str = Query(description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
+    return Bibliohub.select(phonenumber,item_id,num_days)
 
 @app.get("/checkout")
 def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:MethodPayment = Query(description="วิธีการชำระเงิน")):
@@ -1181,6 +1282,35 @@ def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพ�
             "net amount" : transaction.payment.net_amount
         }
     }
+
+@app.get("/get_transaction")
+def get_transaction(phonenumber:str):
+    customer = Bibliohub.get_user_from_phone_number(phonenumber)
+
+    return [{
+        "Transaction" : {
+            "customer name" : transaction.customer.name,
+            "staff name" : transaction.staff.name,
+            "start date" : transaction.start_date_time,
+            "end date" : transaction.end_date_time,
+            "status" : transaction.status,
+            "payment no" : transaction.payment.payment_no,
+            "audit log" : transaction.audit_logs
+        },
+        "Payment" : {
+            "payment no" : transaction.payment.payment_no,
+            "status" : transaction.payment.status,
+            "order" : transaction.payment.order.info,
+            "timestamp" : transaction.payment.timestamp, 
+            "payment method" : transaction.payment.payment_method.name, 
+            "base fee" : transaction.payment.base_fee, 
+            "upgrade delta" : transaction.payment.upgrade_delta,
+            "discount amount" : transaction.payment.discount_amount,
+            "penalty fee" : transaction.payment.penalty_fee,
+            "net amount" : transaction.payment.net_amount
+        }
+    } for transaction in customer.get_all_transaction]
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
