@@ -16,7 +16,7 @@ class System :
         self.__transaction_list = []
         self.__notification_list = []
 
-    def register(self,name,surname,phonenumber,email,birth_month=1):
+    def register(self,name,surname,phonenumber,email,birth_month):
         """
         Registering create member object by using Customer data.
         :param name: name of customer
@@ -703,13 +703,13 @@ bibliohub = System()
 bibliohub.register("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com", 5)
 
 dummy_area = Area("MeetingRoom-01", "Meeting Room", 150.0, ["Projector", "Whiteboard"], 4)
-dummy_area.add_slot(TimeSlot("TS01", "09:00", "10:00"))
-dummy_area.add_slot(TimeSlot("TS02", "10:00", "11:00"))
-dummy_area.add_slot(TimeSlot("TS03", "11:00", "12:00"))
-dummy_area.add_slot(TimeSlot("TS04", "12:00", "13:00"))
-dummy_area.add_slot(TimeSlot("TS05", "13:00", "14:00"))
-dummy_area.add_slot(TimeSlot("TS06", "14:00", "15:00"))
-dummy_area.add_slot(TimeSlot("TS07", "15:00", "16:00"))
+dummy_area.add_slot(TimeSlot("MR01", "09:00", "10:00"))
+dummy_area.add_slot(TimeSlot("MR02", "10:00", "11:00"))
+dummy_area.add_slot(TimeSlot("MR03", "11:00", "12:00"))
+dummy_area.add_slot(TimeSlot("MR04", "12:00", "13:00"))
+dummy_area.add_slot(TimeSlot("MR05", "13:00", "14:00"))
+dummy_area.add_slot(TimeSlot("MR06", "14:00", "15:00"))
+dummy_area.add_slot(TimeSlot("MR07", "15:00", "16:00"))
 bibliohub.add_area(dummy_area)
 
 quiet_area = Area("Quiet-A", "Quiet Area", 50.0, ["Desk Lamp", "Power Outlet"], 1)
