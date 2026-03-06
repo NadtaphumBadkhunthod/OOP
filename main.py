@@ -753,30 +753,55 @@ class Order:
             for bookingarea in self.__booking_area:
                 bookingarea.confirm()
 
+class PromotionType(str ,Enum):
+    DoubleDate = "DoubleDate"
+    BirthMonth = "BirthMonth"
+
 class Promotion:
-    def __init__(self,promo_code,discount_rate):
+    def __init__(self,type : PromotionType,promo_code,discount_rate):
+        self.__type = type
         self.__promo_code = promo_code
         self.__discount_rate = discount_rate
-        self.__status = False
+        self.__status = ItemStatus.Available
         self.__used_user = []
+
+    @property
+    def type(self):
+        return self.__type
         
-    def is_eligible(self,customer):
+    def is_eligible(self,customer,promocode):
         if isinstance(customer,Customer):
-            return customer not in self.__used_user
+            if self.type == PromotionType.BirthMonth:
+                if not isinstance(customer,Member):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="This Promotion Need to be used by Member only"
+                    )
+                
+            return customer not in self.__used_user and promocode == self.__promo_code
         
-    def apply_discount(self,price,customer):
-        if isinstance(customer,Customer):
-            if self.is_eligible(customer):
-                self.__used_user.append(customer)
-                return price - (price * self.__discount_rate)
+    def apply_discount(self,price,customer,promocode):
+        if self.__status == ItemStatus.Available:
+            if promocode == self.__promo_code:
+                if isinstance(customer,Customer):
+                    if self.is_eligible(customer,promocode):
+                        self.__used_user.append(customer)
+                        return self.calculate_discount(customer,price)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Promotion is not Available"
+        )
+
+    def change_stauts(self,status : ItemStatus):
+        self.__status = status
+    
+    def calculate_discount(self,customer,price):
+        if customer in self.__used_user:
+            return (price * self.__discount_rate / 100)
             
     def payment_unsuccess(self,customer):
         if isinstance(customer,Customer):
             self.__used_user.remove(customer)
-
-class BirthDate:
-    def __init__(self):
-        pass
 
 class PaymentMethod(ABC):
     @property
@@ -818,6 +843,7 @@ class Payment:
         self.__status = PaymentStatus.Unpaid.value
         self.__order : Order = Order()
         self.__timestamp = datetime.now()
+        self.__promotion : Promotion = None
         
         if payment_method == PaymentOptions.cash:
             self.__payment_method = Cash()
@@ -850,6 +876,14 @@ class Payment:
         return self.__timestamp
 
     @property
+    def promotion(self):
+        return self.__promotion
+    
+    @promotion.setter
+    def promotion(self,promotion : Promotion):
+        self.__promotion = promotion
+
+    @property
     def payment_method(self) -> PaymentMethod:
         return self.__payment_method
     
@@ -865,6 +899,10 @@ class Payment:
     def discount_amount(self):
         return self.__discount_amount
     
+    @discount_amount.setter
+    def discount_amount(self,amount):
+        self.__discount_amount = amount
+    
     @property
     def penalty_fee(self):
         return self.__penalty_fee
@@ -872,17 +910,22 @@ class Payment:
     @property
     def net_amount(self):
         return self.__net_amount
+    
+    def calculate_subtotal(self):
+        subtotal = 0
+        if self.__order.rent_book:
+            subtotal += self.__order.rent_book.calculate_subtotal()
+        if self.__order.purchase_book:
+            subtotal += self.__order.purchase_book.calculate_subtotal()
+        if len(self.__order.booking_area) > 0:
+            subtotal += sum([bookingarea.calculate_subtotal() for bookingarea in self.__order.booking_area])
+
+        return subtotal
 
     def calculate_net_amount(self):
         self.__net_amount = 0
-        if self.__order.rent_book:
-            self.__net_amount += self.__order.rent_book.calculate_subtotal()
-        if self.__order.purchase_book:
-            self.__net_amount += self.__order.purchase_book.calculate_subtotal()
-        if len(self.__order.booking_area) > 0:
-            self.__net_amount += sum([bookingarea.calculate_subtotal() for bookingarea in self.__order.booking_area])
-        
-        self.__net_amount += self.__upgrade_delta - self.__discount_amount + self.__base_fee + self.__penalty_fee
+        self.__net_amount += self.calculate_subtotal()
+        self.__net_amount += self.__upgrade_delta - abs(self.__discount_amount) + self.__base_fee + self.__penalty_fee
         return self.__net_amount
     
     def update_payment_status(self,status:PaymentStatus):
@@ -966,6 +1009,9 @@ class Transaction:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="activity type not found"
             )
+        
+    def get_sub_total(self):
+        return self.__payment.calculate_subtotal()
         
     def get_net_amount(self):
         return self.__payment.calculate_net_amount()
@@ -1312,7 +1358,7 @@ class System:
             "Customer Selected List" : respond
         }
             
-    def checkout(self,customer:Customer,staff:Staff,payment_method : PaymentOptions):
+    def checkout(self,customer:Customer,staff:Staff,payment_method : PaymentOptions, promocode):
         if not isinstance(customer,Customer):
             return "Not a customer"
         
@@ -1326,6 +1372,15 @@ class System:
         transaction.order = customer.get_selected_list
 
         transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}") #need implement : เพิ่มรูปแบบของ audit log
+
+        for promotion in self.__promotion_list:
+            if promotion.is_eligible(customer,promocode):
+                transaction.payment.promotion = promotion
+                break
+
+        if transaction.payment.promotion:
+            transaction.payment.discount_amount = transaction.payment.promotion.apply_discount(transaction.get_sub_total(),customer,promocode)
+
         result = transaction.payment.payment_method.process_payment(transaction.get_net_amount()) #need implement : calculate payment ใน payment ไปเลย
         print(result)
 
@@ -1415,9 +1470,13 @@ class System:
         if isinstance(staff,Staff):
             self.__staff_list.remove(staff)
 
-    def add_promotion(self,promotion):
-        if isinstance(promotion,Promotion):
-            self.__promotion_list.append(promotion)
+    @property
+    def promotion_list(self):
+        return self.__promotion_list
+
+    def add_promotion(self,type : PromotionType,promocode,discount_rate):
+        if isinstance(type,PromotionType):
+            self.__promotion_list.append(Promotion(type,promocode,discount_rate))
 
     def remove_promotion(self,promotion):
         if isinstance(promotion,Promotion):
@@ -1487,6 +1546,11 @@ def create_staff(name:str = Query(description="ชื่อจริงพนั
     staff = Staff(name,surname,phonenumber,email,birth_month.value)
     print(bibliohub.add_staff(staff))
     return staff
+
+@app.get("/create_promotion",tags=["Main"])
+def create_promotion(type : PromotionType,promocode : str,discount_rate : float):
+    bibliohub.add_promotion(type,promocode,discount_rate)
+    return bibliohub.promotion_list
 
 @app.get("/add_or_create_book",tags=["Book"])
 def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,number_of_copies:int,available_date = Query(default=date.today().strftime("%d/%m/%Y"),description="วัน/เดือน/ปี (เช่น 01/02/2026)")):
@@ -1587,8 +1651,8 @@ def get_all_staff():
     return bibliohub.get_staff_list
 
 @app.get("/checkout",tags=["Checkout"])
-def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:PaymentOptions = Query(description="วิธีการชำระเงิน")):
-    transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method)
+def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:PaymentOptions = Query(description="วิธีการชำระเงิน"),promocode:str = Query(default="xxxxxx",description="รหัสโปรโมชั่น")):
+    transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method,promocode)
 
     return {
         "Transaction" : {
