@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 from enum import Enum
 from abc import ABC, abstractmethod
 import uvicorn
-from contextlib import asynccontextmanager
+import uuid
 
 # Enum Class
 class CustomerStatus(str, Enum):
@@ -40,7 +40,7 @@ class BirthMonth(str, Enum):
     Nov = "11"
     Dec = "12"
 
-class MethodPayment(str,Enum):
+class PaymentOptions(str,Enum):
     cash = "cash"
     qrcode = "qrcode"
 
@@ -57,12 +57,13 @@ class TypeBook(str,Enum):
     Self_improvement = "Self Improvement"
     Economic = "Economic"
 
-class BookStatus(str,Enum):
+class ItemStatus(str,Enum):
     Available = "Available"
-    UnAvailable = "UnAvailable"
+    NotAvailable = "NotAvailable"
     InProcess = "InProcess"
     Purchased = "Purchased"
     Incoming = "Incoming"
+    InUse = "InUse"
 
 class PaymentStatus(str,Enum):
     Unpaid = "Unpaid"
@@ -72,25 +73,25 @@ class PaymentStatus(str,Enum):
 class TransactionStatus(str,Enum):
     Requested = "Requested"
     Confirm = "Confirm"
-    In_Use = "In Use"
     Completed = "Completed"
     Cancelled = "Cancelled"
 
+class AreaType(str,Enum):
+    quiet_area = "Quiet_Area"
+    private_room = "Private_Room" 
+    meeting_room = "Meeting_Room"
+
 # Core Class
 
-class Area:
-    def __init__(self):
-        pass
-
 class Book:
-    def __init__(self,book_info:BookInfo,status:BookStatus):
+    def __init__(self,book_info:BookInfo,status:ItemStatus):
         """
         class Book คือหนังสือที่แยกตาม UID คือหนังสือแต่ละเล่มแยกกันไป เช่น โดเรม่อน เล่มที่ x อันที่ x 
         
         :param book_info: object ที่มีข้อมูลของหนังสือ
         :type book_info: BookInfo
         :param status: สถานะของหนังสือเล่มนั้น
-        :type status: BookStatus
+        :type status: ItemStatus
         """
         self.__book_info = book_info
         self.__book_uid = None
@@ -112,7 +113,7 @@ class Book:
         self.__book_uid = id
 
     @property
-    def book_status(self) -> BookStatus:
+    def book_status(self) -> ItemStatus:
         return self.__book_status
 
     @property
@@ -137,9 +138,9 @@ class Book:
         return self
 
     def check_available(self):
-        return self.__book_status == BookStatus.Available.value
+        return self.__book_status == ItemStatus.Available.value
     
-    def change_status(self,status:BookStatus):
+    def change_status(self,status:ItemStatus):
         self.__book_status = status
 
 class BookInfo:
@@ -166,7 +167,7 @@ class BookInfo:
         self.__activity_type = activity_type
         self.__book : list[Book] = []
         self.__available_date = available_date
-        self.__id = f"BK-{activity_type.value}-{book_stock.name.replace(" ","_")}-{name.replace(" ","_")}-{author}"
+        self.__id = f"BK-{activity_type.value}-{book_stock.name.replace(' ','_')}-{name.replace(' ','_')}-{author}"
     
     @property
     def name(self):
@@ -206,9 +207,9 @@ class BookInfo:
     
     def add_copies(self,copies:int):
         if self.__available_date <= date.today():
-            status = BookStatus.Available
+            status = ItemStatus.Available
         else:
-            status = BookStatus.Incoming
+            status = ItemStatus.Incoming
         
         for _ in range(copies):
             book = Book(self,status)
@@ -226,7 +227,7 @@ class BookInfo:
     def search_book_available(self):
         for book in self.__book:
             if book.check_available():
-                book.change_status(BookStatus.InProcess)
+                book.change_status(ItemStatus.InProcess)
                 return book
             
         raise HTTPException(
@@ -246,6 +247,7 @@ class BookOrder:
     @property
     def nums_date(self):
         return self.__nums_date
+        
 
 class BookStock:
     def __init__(self,name):
@@ -324,6 +326,109 @@ class BookStock:
                 
         return None
         
+WayLaOpen = [
+    ["09:00", "10:00"],
+    ["10:00", "11:00"],
+    ["11:00", "12:00"],
+    ["12:00", "13:00"],
+    ["13:00", "14:00"],
+    ["14:00", "15:00"],
+    ["15:00", "16:00"]
+]
+
+class Area:
+    count = 1
+    def __init__(self,type : AreaType, hourly_rate, feature, capacity):
+        self.__area_id : str = f"AREA-{type.value.upper()}-{self.count}"
+        self.count += 1
+
+        self.__area_type : AreaType = type #บอกว่าเป็นareaแบบไหนเช่น qiuet area,Private Room,Meeting Room
+        self.__hourly_rate : float = hourly_rate
+        self.__feature : list[str] = feature
+        self.__capacity : int = capacity
+        self.__slots : list[TimeSlot] = [] 
+    def __repr__(self):
+        return f"AreaName: {self.__area_id}, Type: {self.__area_type.value}"
+
+    @property
+    def list_timeslot(self) -> list[TimeSlot]:
+        return [slot for slot in self.__slots if slot.is_available == "Available"]
+
+    def create_time_slot(self):
+        for time in WayLaOpen:
+            start_time,end_time = time
+            self.__slots.append(TimeSlot(f"{self.__area_id}-{len(self.__slots) + 1}",start_time,end_time,self))
+
+    @property
+    def area_id(self):
+        return self.__area_id
+    
+    @property
+    def area_type(self):
+        return self.__area_type
+    
+    @property
+    def area_feature(self):
+        return self.__feature
+    
+    @property
+    def area_capacity(self):
+        return self.__capacity
+    
+    @property
+    def area__slots(self):
+        return self.__slots
+
+    @property
+    def hourly_rate(self):
+        return self.__hourly_rate
+    
+class TimeSlot:
+    def __init__(self, slot_id, start_time, end_time, area : Area):
+        self.__slot_id : str = slot_id  
+        self.__start_time : str = start_time
+        self.__end_time : str = end_time
+        self.__is_available : ItemStatus = ItemStatus.Available
+        self.__area : Area = area
+
+    def __repr__(self):
+        return f"Slot[{self.__slot_id}]: {self.__start_time}-{self.__end_time} | {self.__is_available} | {self.__area.hourly_rate}"
+    
+    @property
+    def slot_id(self):
+        return self.__slot_id
+        
+    @property
+    def start_time(self):
+        return self.__start_time
+        
+    @property
+    def end_time(self):
+        return self.__end_time
+
+    @property
+    def is_available(self):
+        return self.__is_available
+    
+    @property
+    def area(self):
+        return self.__area
+
+    def change_status(self, status_change : ItemStatus):
+        self.__is_available = status_change
+
+    @property
+    def area(self):
+        return self.__area
+    
+    @property
+    def list_time_slots(self):
+        return self.__list_time_slots
+    
+    def add_time_slots(self,timeslot : TimeSlot):
+        if isinstance(timeslot,TimeSlot):
+            self.__list_time_slots.append(timeslot)
+
 class Customer:
     def __init__(self,name:str,surname:str,phonenumber:str,email:str):
         """
@@ -341,12 +446,11 @@ class Customer:
         self.__email = email
         self.__transaction : list[Transaction] = []
         self.__notification_list : list[Notification] = []
-        self.__rental_quota = 0
+        self.__booking_reservation_time = 0
+        self.__rental_quota = 4
+        self.__book_rented = 0
         self.__strike = 0
-        self.__selected_list : list[Book,Area] = []
-
-    def set_rental_quota(self,nums_rent):
-        self.__rental_quota += nums_rent
+        self.__selected_list : list[Book | TimeSlot] = []
 
     @property
     def get_all_transaction(self) -> list[Transaction]:
@@ -371,21 +475,51 @@ class Customer:
     @property
     def email(self):
         return self.__email
+    
+    @property
+    def rental_quota(self):
+        return self.__rental_quota
+    
+    @property
+    def book_rented(self):
+        return self.__book_rented
+    
+    @book_rented.setter
+    def book_rented(self,nums_rent):
+        self.__book_rented = nums_rent
 
     def check_eligibility(self):
         return self.__strike < 3
     
-    def check_quota(self): 
-        return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) < (4 - self.__rental_quota)
+    def check_rent_quota(self,request_book_nums): 
+        return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) + request_book_nums < (self.__rental_quota - self.__book_rented)
 
-    def select(self,order : BookInfo | Area,num_days : int = 0) -> str | BookInfo | Area:
-        if isinstance(order,(BookInfo,Area)):
+    def select(self,order : BookInfo | TimeSlot,num_days : int = 0) -> str | BookInfo | Area:
+        if isinstance(order,(BookInfo,TimeSlot)):
             if isinstance(order,BookInfo):
                 order = BookOrder(order,num_days)
             self.__selected_list.append(order)
 
             return order
         return "Not Found"
+    
+    def unselect(self,order : BookInfo | TimeSlot):
+        if order in self.__selected_list:
+            self.__selected_list.remove(order)
+        else:
+            return "Not Found"
+        
+        return "Remove Successful"
+
+    def update_cart(self, new_items_list):
+        """
+        เมธอดสำหรับอัปเดตรายการในตะกร้า 
+        เช่น ใช้ลบของที่จ่ายเงินเสร็จแล้วออกไป
+        """
+        if isinstance(new_items_list, list):
+            self.__selected_list = new_items_list
+            return True
+        return False
 
     def add_notify(self,notification):
         if isinstance(notification,Notification):
@@ -395,6 +529,25 @@ class Customer:
         if isinstance(transaction,Transaction):
             self.__transaction.append(transaction)
             self.__selected_list = []
+
+    @property
+    def booking_reservation_time(self):
+        """คืนค่าจำนวนชั่วโมงที่จองไปแล้ว"""
+        return self.__booking_reservation_time
+    
+    @booking_reservation_time.setter
+    def booking_reservation_time(self, amount: int):
+        self.__booking_reservation_time = amount
+
+    def get_area_quota(self):
+        return 2  
+
+    def check_area_quota(self, requesting_slots_count):
+        current_in_cart = len([item for item in self.__selected_list if isinstance(item, dict) and item.get("type") == "temp_area"])
+
+        total_usage = self.booking_reservation_time + current_in_cart + requesting_slots_count
+        
+        return total_usage <= self.get_area_quota()
 
 class Member(Customer):
     def __init__(self, name, surname, phonenumber, email, birth_month : BirthMonth):
@@ -460,11 +613,11 @@ class Manager(Staff):
         pass
 
 class Purchase:
-    def __init__(self,order : list[Book,Area]):
-        self._order : list[Book,Area] = order
+    def __init__(self,order : list[Book | TimeSlot]):
+        self._order : list[Book | TimeSlot] = order
 
     @property
-    def get_order(self):
+    def get_order(self) -> list[Book | TimeSlot]:
         return self._order
 
     def calculate_subtotal(self):
@@ -472,10 +625,10 @@ class Purchase:
     
     def confirm(self):
         for item in self._order:
-            item.change_status(BookStatus.Purchased)
+            item.change_status(ItemStatus.Purchased)
 
 class RentBook(Purchase):
-    def __init__(self,order : list[Book,Area]):
+    def __init__(self,order : list[Book | TimeSlot]):
         super().__init__(order)
         self.__late_penalty_rate = 10
 
@@ -488,12 +641,43 @@ class RentBook(Purchase):
     
     def confirm(self):
         for item in self._order:
-            item.change_status(BookStatus.UnAvailable)
+            item.change_status(ItemStatus.NotAvailable)
     
+class BookingArea(Purchase):
+    def __init__(self, order : list[Book | TimeSlot]):
+        super().__init__(order)
+        self.__area : Area = order[0].area if order else None
+    
+    @property
+    def area(self):
+        return self.__area
+    
+    def add_timeslot(self, list_timeslot : list[TimeSlot]):
+        if isinstance(list_timeslot,list[TimeSlot]):
+            self._order.extend(list_timeslot)
+        
+    def calculate_subtotal(self):
+        return len(self.get_order) * self.__area.hourly_rate
+
+    def calculate_upgrade_delta(self, new_hourly_rate):
+        old_price = self.calculate_subtotal()
+        new_price = len(self.__order) * new_hourly_rate
+        delta = new_price - old_price
+        return delta
+
+    def update_order(self, new_slots, new_area):
+        self.__order = new_slots
+        self.__area = new_area
+
+    def confirm(self):
+        for item in self._order:
+            item.change_status(ItemStatus.NotAvailable)
+
 class Order:
     def __init__(self):
         self.__rent_book : RentBook = None
         self.__purchase_book : Purchase = None
+        self.__booking_area : list[BookingArea] = []
 
     @property
     def info(self):
@@ -514,7 +698,16 @@ class Order:
                 result["Start Date"] = book.start_date
                 result["End Date"] = book.end_date
             return result
-        order_info = [format_book(rent_book) for rent_book in (self.__rent_book.get_order + self.__purchase_book.get_order)]
+        order_info = []
+        if self.__rent_book:
+            order_info.extend([format_book(rent_book) for rent_book in self.__rent_book.get_order])
+        if self.__purchase_book:
+            order_info.extend([format_book(purchase_book) for purchase_book in self.__purchase_book.get_order])
+        if self.__booking_area:
+            order_info.extend([{
+                "Area" : f"{booking_area.area}",
+                "Area Order" : [f"{order}" for order in booking_area.get_order]
+            } for booking_area in self.__booking_area])
         return {"Order Info" : order_info}
 
     @property
@@ -522,23 +715,43 @@ class Order:
         return self.__rent_book
     
     @rent_book.setter
-    def rent_book(self,rent_book : RentBook):
-        self.__rent_book = rent_book
+    def rent_book(self,book_list : list[Book]):
+        self.__rent_book = RentBook(book_list)
 
     @property
     def purchase_book(self):
         return self.__purchase_book
     
     @purchase_book.setter
-    def purchase_book(self,purchase_book):
-        self.__purchase_book = purchase_book
+    def purchase_book(self,book_list : list[Book]):
+        self.__purchase_book = Purchase(book_list)
+
+    @property
+    def booking_area(self):
+        return self.__booking_area
+    
+    @booking_area.setter
+    def booking_area(self,timeslot_list : dict[AreaType, list[TimeSlot]]):
+        for bookingarea in self.__booking_area:
+            if timeslot_list.get(bookingarea.area.area_type):
+                bookingarea.add_timeslot(timeslot_list[bookingarea.area.area_type])
+                return
+        for areatype in AreaType:
+            if timeslot_list.get(areatype):
+                self.__booking_area.append(BookingArea(timeslot_list[areatype]))
+
 
     def calculate_subtotal(self):
         return self.__purchase_book.calculate_subtotal() + self.__rent_book.calculate_subtotal()
     
     def confirm(self):
-        self.__purchase_book.confirm()
-        self.__rent_book.confirm()
+        if self.__purchase_book:
+            self.__purchase_book.confirm()
+        if self.__rent_book:
+            self.__rent_book.confirm()
+        if len(self.__booking_area) > 0:
+            for bookingarea in self.__booking_area:
+                bookingarea.confirm()
 
 class Promotion:
     def __init__(self,promo_code,discount_rate):
@@ -599,21 +812,26 @@ class QRCode(PaymentMethod):
         return f"Process with QRCode : {Amount} code QR-{self.__phonenumber}"
 
 class Payment:
-    count = 0
-    def __init__(self,customer : Customer,payment_method : PaymentMethod):
+    def __init__(self,customer : Customer,payment_method : PaymentOptions):
         self.__customer = customer
-        self.__payment_no = f"PYM-{Payment.count}"
+        self.__payment_no = f"PAY-{uuid.uuid4().hex[:8].upper()}"
         self.__status = PaymentStatus.Unpaid.value
         self.__order : Order = Order()
         self.__timestamp = datetime.now()
-        self.__payment_method = payment_method
+        
+        if payment_method == PaymentOptions.cash:
+            self.__payment_method = Cash()
+        elif payment_method == PaymentOptions.qr_code:
+            self.__payment_method = QRCode(self.__customer.phonenumber)
+        else:
+            print(payment_method)
+            raise ValueError("Payment Option Error")
+        
         self.__base_fee = 10 # เท่าไหร่อ่ะ need implement
         self.__upgrade_delta = 0
         self.__discount_amount = 0
         self.__penalty_fee = 0
         self.__net_amount = 0
-
-        Payment.count += 1
 
     @property
     def payment_no(self):
@@ -656,7 +874,15 @@ class Payment:
         return self.__net_amount
 
     def calculate_net_amount(self):
-        self.__net_amount = self.__order.rent_book.calculate_subtotal() + self.__order.purchase_book.calculate_subtotal() + self.__upgrade_delta - self.__discount_amount + self.__base_fee + self.__penalty_fee
+        self.__net_amount = 0
+        if self.__order.rent_book:
+            self.__net_amount += self.__order.rent_book.calculate_subtotal()
+        if self.__order.purchase_book:
+            self.__net_amount += self.__order.purchase_book.calculate_subtotal()
+        if len(self.__order.booking_area) > 0:
+            self.__net_amount += sum([bookingarea.calculate_subtotal() for bookingarea in self.__order.booking_area])
+        
+        self.__net_amount += self.__upgrade_delta - self.__discount_amount + self.__base_fee + self.__penalty_fee
         return self.__net_amount
     
     def update_payment_status(self,status:PaymentStatus):
@@ -669,7 +895,7 @@ class Payment:
         self.__penalty_fee += penalty_fee
 
 class Transaction:
-    def __init__(self,customer:Customer,staff:Staff,payment_method : {QRCode,Cash},start_date_time : datetime = datetime.now(), end_date_time : datetime = datetime.now()):
+    def __init__(self,customer:Customer,staff:Staff,payment_method : PaymentOptions,start_date_time : datetime = datetime.now(), end_date_time : datetime = datetime.now()):
         self.__customer = customer
         self.__staff = staff
         self.__start_date_time = start_date_time
@@ -711,12 +937,31 @@ class Transaction:
         return self.__payment.order
     
     @order.setter
-    def order(self,order : {RentBook,Purchase}):
-        if isinstance(order,RentBook):
-            self.__payment.order.rent_book = order
-        elif isinstance(order,Purchase):
-            self.__payment.order.purchase_book = order
-        else:
+    def order(self,selected_list : list[BookOrder | TimeSlot]):
+        rent_list = [order.book_info.search_book_available().calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
+        purchase_list = [order.book_info.search_book_available() for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
+        area_list = {}
+
+        for areatype in AreaType:
+            area_in_type_list = []
+            for item in selected_list:
+                if isinstance(item,TimeSlot):
+                    if item.area.area_type == areatype:
+                        area_in_type_list.append(item)
+            
+            if len(area_in_type_list) > 0:
+                area_list[areatype] = area_in_type_list
+        
+        if len(rent_list) > 0:
+            self.__customer.book_rented += len(rent_list) 
+            self.__payment.order.rent_book = rent_list
+        if len(purchase_list) > 0:
+            self.__payment.order.purchase_book = purchase_list
+        if len(area_list) > 0:
+            self.__customer.booking_reservation_time += len([timeslot for timeslot in selected_list if isinstance(timeslot,TimeSlot)])
+            self.__payment.order.booking_area = area_list
+        
+        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="activity type not found"
@@ -758,7 +1003,11 @@ class System:
         self.__transaction_list : list[Transaction] = []
         self.__notification_list : list[Notification] = []
 
-    def register(self,name,surname,phonenumber,email) -> Member | str:
+    @property
+    def list_area(self):
+        return self.__area
+
+    def register(self,name,surname,phonenumber,email,birth_month=BirthMonth.Jan) -> Member | str:
         """
         Registering create member object by using Customer data.
         :param name: name of customer
@@ -779,7 +1028,7 @@ class System:
                 detail="Account Duplicate"
             )
         
-        member = Member(name,surname,phonenumber,email)
+        member = Member(name,surname,phonenumber,email,birth_month)
         self.__customer_list.append(member)
 
         return member
@@ -924,52 +1173,125 @@ class System:
     def check_type_from_id(self,item_id:str) -> str:
         if item_id.startswith("BK"):
             return ItemType.Book
-        elif item_id.startswith("AR"):
+        elif item_id.startswith("AREA"):
             return ItemType.Area
         else:
             raise ValueError("Invalid ID format")
         
-    def get_data_from_id(self,type_of_item:str,item_id:str):
-        if type_of_item == "Book":
+    def get_data_from_id(self,type_of_item:ItemType,item_id:str):
+        if type_of_item == ItemType.Book:
             parts = item_id.split("-")
             activity_type = parts[1]
             series = parts[2].replace("_"," ")
             book_name = parts[3].replace("_"," ")
             author = parts[4].replace("_"," ")
-            return activity_type,series,book_name,author
-        elif type_of_item == "Area":
-            pass
-        else:
-            raise ValueError("Invalid ID format")
-
-    def select(self,phonenumber : str,item_id : str,num_days : int) -> dict | str:
-        customer = Bibliohub.get_user_from_phone_number(phonenumber)
-        type_of_item = self.check_type_from_id(item_id)
-
-        if self.check_type_from_id(item_id) == ItemType.Book:
-            activity_type,series,book_name,author = self.get_data_from_id(type_of_item,item_id)
-
             if activity_type == ActivityType.Rent.value:
                 activity_type = ActivityType.Rent
-                if not customer.check_quota():
-                    raise HTTPException(
-                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
-                        detail="Quota การเช่าเกินกำหนดแล้ว"
-                    )
             elif activity_type == ActivityType.Purchase.value:
                 activity_type = ActivityType.Purchase
-
-            book_info = Bibliohub.get_book_info(series,book_name,author,activity_type)
-
-            if not book_info:
+            else:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Book Not Found, Maybe checking your book id"
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Activity Type Not Found"
                 )
-            
-            customer.select(book_info,num_days)
+            return activity_type,series,book_name,author
+        elif type_of_item == ItemType.Area:
+            parts = item_id.split("-")
+            area_id = "-".join(parts[:3])
+            time_slot_id = item_id
+            return area_id, time_slot_id
+        else:
+            raise ValueError("Invalid ID format")
+        
+    def search_area(self,customer,area_id):
+        if not customer.check_eligibility():
+                raise PermissionError("Not come in to my place go away don't comeback")
+        
+        for area in self.__area:
+            if area.area_id == area_id:
+                available_slots = area.list_timeslot
+                
+                # โชว์ ID พ่วงไปด้วยเลย (เช่น "TS01: 09:00-10:00")
+                return [f"{slot.slot_id}: {slot.start_time}-{slot.end_time}" for slot in available_slots]
+                
+        raise ValueError("ไม่พบพื้นที่ที่ค้นหา")
 
+    def select(self,phonenumber : str,item_id : list[str],num_days : int = 1) -> dict | str:
+        customer = self.get_user_from_phone_number(phonenumber)
+        selectitem_list = []
 
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="'User' Not Found"
+            )
+        for id in item_id:
+            type_of_item = self.check_type_from_id(id)
+
+            if type_of_item == ItemType.Book:
+                activity_type,series,book_name,author = self.get_data_from_id(type_of_item,id)
+
+                book_info = self.get_book_info(series,book_name,author,activity_type)
+
+                if not book_info:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Book Not Found, Maybe checking your book id"
+                    )
+                
+                selectitem_list.append(book_info)
+            elif type_of_item == ItemType.Area:
+                area_id,time_slot_id = self.get_data_from_id(type_of_item,id)
+
+                target_area = None
+                for area in self.list_area:
+                    if area.area_id == area_id:
+                        target_area = area
+                        break
+
+                if not target_area:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="ไม่พบพื้นที่"
+                    )
+                
+                target_time_slot = None
+                for timeslot in area.list_timeslot:
+                    if timeslot.slot_id == time_slot_id:
+                        target_time_slot = timeslot
+                        break
+                        
+                if not target_time_slot or target_time_slot.is_available != ItemStatus.Available:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)"
+                    )
+                
+                if target_time_slot not in selectitem_list and target_time_slot not in customer.get_selected_list:
+                    selectitem_list.append(timeslot)
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"{target_time_slot} - Already Selected"
+                    )
+                
+        if not customer.check_area_quota(len([request_slot for request_slot in selectitem_list if isinstance(request_slot,TimeSlot)])):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"สล็อตโควต้าเต็ม! คุณจองได้อีก {customer.get_area_quota() - customer.booking_reservation_time} ชม."
+            )
+        
+        if not customer.check_rent_quota(len([rentbook for rentbook in selectitem_list if isinstance(rentbook,BookInfo) and rentbook.activity_type == ActivityType.Rent])):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"เช่าหนังสือโควต้าเต็ม! คุณจองได้อีก {customer.rental_quota - customer.book_rented} เล่ม"
+            )
+        
+        for item in selectitem_list:
+            if isinstance(item,BookInfo):
+                customer.select(item,num_days)
+            elif isinstance(item,(TimeSlot,Purchase)):
+                customer.select(item)
         respond = []
 
         for selected in customer.get_selected_list:
@@ -983,24 +1305,16 @@ class System:
                     "Book Activity Type" : selected.book_info.activity_type.value,
                     "Book Available Date" : selected.book_info.available_date
                 })
+            elif isinstance(selected,TimeSlot):
+                respond.append(f"{selected}")
         print("Select Successful")
         return {
             "Customer Selected List" : respond
         }
             
-    def checkout(self,customer:Customer,staff:Staff,payment_method : MethodPayment):
-        rent_list = []
-        purchase_list = []
-
+    def checkout(self,customer:Customer,staff:Staff,payment_method : PaymentOptions):
         if not isinstance(customer,Customer):
             return "Not a customer"
-        
-        if payment_method == MethodPayment.cash:
-            payment_method : Cash = Cash()
-        elif payment_method == MethodPayment.qrcode:
-            payment_method : QRCode = QRCode(customer.phonenumber)
-        else:
-            raise TypeError("Method Payment error")
         
         if len(customer.get_selected_list) == 0:
             raise HTTPException(
@@ -1008,21 +1322,15 @@ class System:
                 detail="No Order"
             )
 
-        rent_list = [selected.book_info.search_book_available().calculate_end_date(selected.nums_date) for selected in customer.get_selected_list if isinstance(selected, BookOrder) and selected.book_info.activity_type.value == "Rent"]
-        purchase_list = [selected.book_info.search_book_available() for selected in customer.get_selected_list if isinstance(selected, BookOrder) and selected.book_info.activity_type.value == "Purchase"]
-
         transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
-        transaction.order = RentBook(rent_list)
-        transaction.order = Purchase(purchase_list)
+        transaction.order = customer.get_selected_list
 
-        transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime("%d/%m/%Y, %H:%M:%S")}") #need implement : เพิ่มรูปแบบของ audit log
-        result = payment_method.process_payment(transaction.get_net_amount()) #need implement : calculate payment ใน payment ไปเลย
+        transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}") #need implement : เพิ่มรูปแบบของ audit log
+        result = transaction.payment.payment_method.process_payment(transaction.get_net_amount()) #need implement : calculate payment ใน payment ไปเลย
         print(result)
 
-        if len(rent_list) > 0:
-            customer.set_rental_quota(len(rent_list))   
         transaction.update_status(TransactionStatus.Confirm)
-        transaction.add_audit_log(f"transaction completed : {datetime.now().strftime("%d/%m/%Y, %H:%M:%S")}")
+        transaction.add_audit_log(f"transaction completed : {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}")
 
         # ส่วนท้ายการทำงาน need implement : ถ้ารายการไหนต้อง update status ของสินค้ามาทำในส่วนนี้
         self.__transaction_list.append(transaction)
@@ -1033,7 +1341,7 @@ class System:
             customer.add_point()
             self.notify_user(customer,f"{customer.name}: add point successful")
 
-        print("Checkout Successful")
+        print("Checkout For Book Successful")
         return transaction
     
     def verify_permission(self,manager) -> bool:
@@ -1115,9 +1423,10 @@ class System:
         if isinstance(promotion,Promotion):
             self.__promotion_list.remove(promotion)
     
-    def add_area(self,area):
-        if isinstance(area,Area):
-            self.__area.append(area)
+    def add_area(self,type,hourly_rate,feature,capacity):
+        area = Area(type,hourly_rate,feature,capacity)
+        area.create_time_slot()
+        self.__area.append(area)
 
     def remove_area(self,area):
         if isinstance(area,Area):
@@ -1144,69 +1453,85 @@ class System:
     def generate_utilization_report(self):
         pass        
     
-Bibliohub = System()
+bibliohub = System()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("Base Testcase Start")
-    create_staff("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th",BirthMonth.Jan)
-    create_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
+bibliohub.register("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com", BirthMonth.Jun)
+bibliohub.add_area(AreaType.meeting_room,150.0,["Projector", "Whiteboard"], 4)
+bibliohub.add_area(AreaType.quiet_area, 50.0, ["Desk Lamp", "Power Outlet"], 1)
+area_names = {area.area_id.replace("-", "_").lower(): area.area_id for area in bibliohub.list_area}
 
-    # Create_Book
-    create_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,1,date.today().strftime("%d/%m/%Y"))
-    create_book("How to learn OOP 2","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,2,date.today().strftime("%d/%m/%Y"))
-    create_book("How to learn OOP 2","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Purchase,2,date.today().strftime("%d/%m/%Y"))
-    create_book("IDK","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,1,date.today().strftime("%d/%m/%Y"))
-    create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,date.today().strftime("%d/%m/%Y"))
+AreaOption = Enum('AreaOption', area_names, type=str)
+class PaymentOptions(str, Enum):
+    qr_code = "QRCode"
+    cash = "Cash"
 
-    # Add Copies
-    create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,date.today().strftime("%d/%m/%Y"))
-    create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Purchase,10,date.today().strftime("%d/%m/%Y"))
-
-    try:
-        select("1111111111","BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsa",1)
-        print("What is wrong")
-    except HTTPException as e:
-        print(f"Pass error ID Not Found : Expect 404({e})")
-        
-    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",1)
-    select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",1)
-    try:
-        select("1111111111","BK-Rent-IDK-IDK_2-Sixsax",1)
-    except HTTPException as e:
-        print(f"Pass error เช่าเกิน : Expect 406 ({e})")
-
-    checkout("1111111111","STF-0",MethodPayment.cash)
-    print("Base Testcase Complete")
-    yield
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 @app.get("/")
 def redirect_to_docs():
     return RedirectResponse(url="/docs")
 
-@app.get("/create_customer")
+@app.get("/create_customer",tags=["Main"])
 def create_customer(name:str = Query(description="ชื่อจริงลูกค้า"),surname:str = Query(description="นามสกุลลูกค้า"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์ลูกค้า"),email:str = Query(description="อีเมลลูกค้า")):
     customer = Customer(name,surname,phonenumber,email)
-    Bibliohub.add_customer(customer)
+    bibliohub.add_customer(customer)
     return {
         "Result Customer" : customer 
     }
 
-@app.get("/create_staff")
+@app.get("/create_staff",tags=["Main"])
 def create_staff(name:str = Query(description="ชื่อจริงพนักงาน"),surname:str = Query(description="นามสกุลพนักงาน"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์พนักงาน"),email:str = Query(description="อีเมลพนักงาน"),birth_month:BirthMonth = Query(description="เดือนเกิดพนักงาน")):
-    if not (Bibliohub.validate_name_and_surname(name,surname) and Bibliohub.validate_phonenumber(phonenumber) and Bibliohub.validate_email):
+    if not (bibliohub.validate_name_and_surname(name,surname) and bibliohub.validate_phonenumber(phonenumber) and bibliohub.validate_email):
         return "something wrong"
     
     staff = Staff(name,surname,phonenumber,email,birth_month.value)
-    print(Bibliohub.add_staff(staff))
+    print(bibliohub.add_staff(staff))
     return staff
 
-@app.get("/add_or_create_book")
+@app.get("/add_or_create_book",tags=["Book"])
 def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,number_of_copies:int,available_date = Query(default=date.today().strftime("%d/%m/%Y"),description="วัน/เดือน/ปี (เช่น 01/02/2026)")):
-    print(Bibliohub.add_book(book_name,series,author,category,price,activity_type,number_of_copies,datetime.strptime(available_date, "%d/%m/%Y").date()))
-    return Bibliohub.get_all_book()
+    print(bibliohub.add_book(book_name,series,author,category,price,activity_type,number_of_copies,datetime.strptime(available_date, "%d/%m/%Y").date()))
+    return bibliohub.get_all_book()
+
+@app.get("/all_area", tags=["Booking Area"])
+def read_all_areas():
+    all_areas = []
+    for area in bibliohub.list_area:
+        slots_list = []
+        for slot in area.area__slots:
+            slots_list.append({
+                "slot_id": slot.slot_id,
+                "time_range": f"{slot.start_time} - {slot.end_time}",
+                "status": slot.is_available
+            })
+        all_areas.append({
+            "area_id": area.area_id,          
+            "area_type": area.area_type,       
+            "hourly_rate": area.hourly_rate,  
+            "features": area.area_feature,   
+            "capacity": area.area_capacity,   
+            "time_slots": slots_list          
+        })
+        
+    return {
+        "message": "Welcome to BiblioHub Booking System",
+        "total_areas": len(all_areas),
+        "areas_catalog": all_areas
+    }
+
+@app.get("/area/search", tags=["Booking Area"])
+def search_area(phonenumber: str = Query(description="เบอร์โทรศัพท์ลูกค้า (เช่น 812345678)"), 
+                    area_id: AreaOption = Query(..., description="เลือกพื้นที่ที่ต้องการจอง")):
+    
+    customer = bibliohub.get_user_from_phone_number(phonenumber)
+    if not customer:
+        return {"error": "ไม่พบผู้ใช้ในระบบ"}
+        
+    try:
+        available_slots = bibliohub.search_area(customer, area_id.value)
+        return {"area_id": area_id, "available_slots": available_slots}
+    except Exception as e:
+        return {"error": str(e)}
 
 def format_book_info(book : BookInfo):
     return {
@@ -1216,11 +1541,11 @@ def format_book_info(book : BookInfo):
         "book available : " : book.get_nums_available()
     }
 
-@app.get("/get_all_book_series")
+@app.get("/get_all_book_series",tags=["Book"])
 def get_all_book_series():
     respond = []
 
-    for bookstock in Bibliohub.get_all_book():
+    for bookstock in bibliohub.get_all_book():
         respond.append({
             "Book Series" : bookstock.name,
             "Book For Sales" : [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Purchase)],
@@ -1231,13 +1556,9 @@ def get_all_book_series():
         "All Book Series" : respond
     }
 
-@app.get("/get_all_staff")
-def get_all_staff():
-    return Bibliohub.get_staff_list
-
-@app.get("/search_book_by_series")
+@app.get("/search_book_by_series",tags=["Book"])
 def search_book_by_series(series : str):
-    result : tuple[list[BookInfo],list[BookInfo]] = Bibliohub.search_book_by_series(series)
+    result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.search_book_by_series(series)
     
     if not result:
         return "Series Not Found"
@@ -1257,13 +1578,17 @@ def search_book_by_series(series : str):
         } for book in book_for_sales]
     }
 
-@app.get("/select")
-def select(phonenumber:str,item_id:str = Query(description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
-    return Bibliohub.select(phonenumber,item_id,num_days)
+@app.get("/select",tags=["Select"])
+def select(phonenumber:str,item_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
+    return bibliohub.select(phonenumber,item_id,num_days)
 
-@app.get("/checkout")
-def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:MethodPayment = Query(description="วิธีการชำระเงิน")):
-    transaction = Bibliohub.checkout(Bibliohub.get_user_from_phone_number(phonenumber),Bibliohub.get_staff_by_no_staff(no_staff),payment_method)
+@app.get("/get_all_staff",tags=["Checkout"])
+def get_all_staff():
+    return bibliohub.get_staff_list
+
+@app.get("/checkout",tags=["Checkout"])
+def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:PaymentOptions = Query(description="วิธีการชำระเงิน")):
+    transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method)
 
     return {
         "Transaction" : {
@@ -1289,9 +1614,9 @@ def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพ�
         }
     }
 
-@app.get("/get_transaction")
+@app.get("/get_transaction",tags=["Main"])
 def get_transaction(phonenumber:str):
-    customer = Bibliohub.get_user_from_phone_number(phonenumber)
+    customer = bibliohub.get_user_from_phone_number(phonenumber)
 
     return [{
         "Transaction" : {
@@ -1317,6 +1642,37 @@ def get_transaction(phonenumber:str):
         }
     } for transaction in customer.get_all_transaction]
 
+print("Base Testcase Start")
+create_staff("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th",BirthMonth.Jan)
+create_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
+
+# Create_Book
+create_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,1,date.today().strftime("%d/%m/%Y"))
+create_book("How to learn OOP 2","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,2,date.today().strftime("%d/%m/%Y"))
+create_book("How to learn OOP 2","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Purchase,2,date.today().strftime("%d/%m/%Y"))
+create_book("IDK","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,1,date.today().strftime("%d/%m/%Y"))
+create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,date.today().strftime("%d/%m/%Y"))
+
+# Add Copies
+create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,date.today().strftime("%d/%m/%Y"))
+create_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Purchase,10,date.today().strftime("%d/%m/%Y"))
+
+# try:
+#     select("1111111111",["BK-Rent-How_to_learn_OOP-How_to_learn_OOP_2-Sixsa"],1)
+# except HTTPException as e:
+#     print(f"Pass error ID Not Found : Expect 404({e})")
+    
+
+# select("1111111111",["BK-Purchase-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax"],1)
+# select("1111111111",["BK-Rent-IDK-IDK_2-Sixsax"],1)
+# select("1111111111",["BK-Rent-IDK-IDK_2-Sixsax"],1)
+# try:
+#     select("1111111111",["BK-Rent-IDK-IDK_2-Sixsax"],1)
+# except HTTPException as e:
+#     print(f"Pass error เช่าเกิน : Expect 406 ({e})")
+
+# checkout("1111111111","STF-0",PaymentOptions.cash)
+print("Base Testcase Complete")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
