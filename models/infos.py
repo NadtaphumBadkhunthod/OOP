@@ -57,6 +57,7 @@ class ItemStatus(str,Enum):
     Purchased = "Purchased"
     Incoming = "Incoming"
     InUse = "InUse"
+    Confirm = "Confirm"
 
 class PaymentStatus(str,Enum):
     Unpaid = "Unpaid"

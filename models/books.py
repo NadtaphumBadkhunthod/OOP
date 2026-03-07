@@ -18,9 +18,9 @@ class Book:
         self.__book_info = book_info
         self.__book_uid = None
         self.__book_status = status
-        self.__start_date = None 
-        self.__end_date = None
-        self.__actual_return_date = None
+        self.__start_date : datetime = None 
+        self.__end_date : datetime = None
+        self.__actual_return_date : datetime = None
     
     @property
     def book_info(self):
@@ -114,6 +114,10 @@ class BookInfo:
     @property
     def activity_type(self) -> ActivityType:
         return self.__activity_type
+    
+    @property
+    def book_list(self):
+        return self.__book
         
     @property
     def available_date(self) -> date:

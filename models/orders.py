@@ -111,7 +111,7 @@ class RentBook(Purchase):
     
     def confirm(self):
         for item in self._order:
-            item.change_status(ItemStatus.NotAvailable)
+            item.change_status(ItemStatus.Confirm)
     
 class BookingArea(Purchase):
     def __init__(self, order : list[Book | TimeSlot]):

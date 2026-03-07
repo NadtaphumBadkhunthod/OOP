@@ -17,6 +17,11 @@ class System:
         self.__customer_list : list[Customer] = []
         self.__transaction_list : list[Transaction] = []
         self.__notification_list : list[Notification] = []
+        self.__book_returned_list : list[Book] = []
+
+    @property
+    def book_returned_list(self):
+        return self.__book_returned_list
 
     @property
     def list_area(self):
@@ -178,10 +183,12 @@ class System:
             detail="Book Series Not Found"
         )
     
-    def get_book(self,book_series,bookname,activity_type) -> Book | None:
+    def get_book(self,book_series,bookname,author,activity_type,book_id) -> Book | None:
             for bookstock in self.__book_stock:
                 if bookstock.name == book_series:
-                    return bookstock.get_book_available(bookname,activity_type) 
+                    for book in self.get_book_info(book_series,bookname,author,activity_type).book_list:
+                        if book.uid == book_id:
+                            return book
             return None
 
     def check_type_from_id(self,item_id:str) -> str:
@@ -358,7 +365,7 @@ class System:
         # ส่วนท้ายการทำงาน need implement : ถ้ารายการไหนต้อง update status ของสินค้ามาทำในส่วนนี้
         self.__transaction_list.append(transaction)
 
-        self.notify_user(customer,f"{customer.name}: transactionconfirm") #need implement : ต้องเปลี่ยนคำ
+        self.notify_user(customer,f"{customer.name}: transaction confirm") #need implement : ต้องเปลี่ยนคำ
 
         if isinstance(customer,Member):
             customer.add_point()
@@ -483,6 +490,85 @@ class System:
                 notification = Notification(customer,message)
                 customer.add_notify(notification)
                 self.__notification_list.append(notification)
+
+    def return_book(self,book_id : list[str]):
+        result = []
+        for id in book_id:
+            type_item = self.check_type_from_id(id)
+            if not type_item == ItemType.Book:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Need to return a book only"
+                )
+            
+            activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
+
+            book = self.get_book(series,book_name,author,activity_type,id)
+
+            if not book:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Book Not Found | id : {id}"
+                )
+            
+            if book.book_status != ItemStatus.InUse and book.book_status != ItemStatus.Confirm:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"This book is not in use"
+                )
+            
+            book.change_status(ItemStatus.NotAvailable)
+
+            result.append(id)
+            
+            self.__book_returned_list.append(book)
+        return {
+            "Book Returned" : result
+        }
+
+    def process_return_book(self,no_staff,book_id : list[str]):
+        if not isinstance(self.get_staff_by_no_staff(no_staff),Staff):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Need to be staff for process returned book"
+            )
+        
+        result = []
+
+        for id in book_id:
+            type_item = self.check_type_from_id(id)
+            if not type_item == ItemType.Book:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Need to return a book only"
+                )
+            
+            activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
+
+            book = self.get_book(series,book_name,author,activity_type,id)
+
+            if not book:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Book Not Found | id : {id}"
+                )
+            
+            if book not in self.book_returned_list:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Book not return yet"
+                )
+            
+            result.append(id)
+            
+            book.change_status(ItemStatus.Available)
+
+        return {
+            "Book Process Successful" : result
+        }
+        
+            
+
 
     def upgrade_booking_area(self):
         pass
