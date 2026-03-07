@@ -1,0 +1,72 @@
+sequenceDiagram
+    autonumber
+    actor S as System 
+    participant SYS as BiblioHubSystem
+    participant TS as Transaction
+    participant CS as Customer
+    participant NTF as Notification
+
+    S->>SYS: notify_user(customer, message)
+
+    loop each Transaction in self.__transaction_list
+        SYS->>TS: get_customer()
+        TS-->>SYS: customer_obj
+        
+        %% Booking Area
+        opt has Booking Area
+            SYS->>TS: get_booking_area_slots()
+            TS-->>SYS: timeslot_list
+            loop each timeslot
+                SYS->>SYS: calculate_time_noti(slot.start_time, slot.end_time)
+                SYS->>NTF: send_message(customer, message)
+                NTF-->>SYS: return "Notification sended allready"
+                SYS->>CS: add_notify(Notification)
+                CS-->>SYS: return "Now the Notification sent to customer success"
+                SYS->>SYS: add_notification(Notification)
+            end
+        end
+
+        %% Rent Book
+        opt has Rent Books
+            SYS->>TS: get_rented_books()
+            TS-->>SYS: rent_book_list
+            loop each book
+                SYS->>SYS: calculate_time_noti(book.start_date, book.end_date)
+                SYS->>NTF: send_message(customer, message)
+                NTF-->>SYS: return "Notification sended allready"
+                SYS->>CS: add_notify(Notification)
+                CS-->>SYS: return "Now the Notification sent to customer success"
+                SYS->>SYS: add_notification(Notification)
+            end
+        end
+
+        %% Purchase Book
+        opt has Purchase Book
+            SYS->>TS: get_purchase_books()
+            TS-->>SYS: putchase_book_list
+            loop each book
+                SYS->>SYS: calculate_time_noti(start_date, end_date = start_date)
+                SYS->>NTF: send_message(customer, message)
+                NTF-->>SYS: return "Notification sended allready"
+                SYS->>CS: add_notify(Notification)
+                CS-->>SYS: return "Now the Notification sent to customer success"
+                SYS->>SYS: add_notification(Notification)
+            end
+        end
+
+        %% BookingBook
+        opt has BookingBook Book
+            SYS->>TS: get_booking_books()
+            TS-->>SYS: booking_book_list
+            loop each book
+                SYS->>SYS: calculate_time_noti(book.start_date, book.end_date)
+                SYS->>NTF: send_message(customer, message)
+                NTF-->>SYS: return "Notification sended allready"
+                SYS->>CS: add_notify(Notification)
+                CS-->>SYS: return "Now the Notification sent to customer success"
+                SYS->>SYS: add_notification(Notification)
+            end
+        end
+    end
+    
+    SYS-->>S: status("All notifications processed")
