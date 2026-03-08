@@ -344,7 +344,7 @@ class System:
             )
 
         transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
-        transaction.order = customer.get_selected_list
+        transaction.make_order(customer)
 
         transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}") #need implement : เพิ่มรูปแบบของ audit log
 
@@ -491,14 +491,7 @@ class System:
                 customer.add_notify(notification)
                 self.__notification_list.append(notification)
 
-    def return_book(self,phonenumber,book_id : list[str]):
-        customer = self.get_user_from_phone_number(phonenumber)
-
-        if not customer:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Customer Not Found"
-            )
+    def return_book(self,book_id : list[str]):
 
         result = []
         for id in book_id:
@@ -531,9 +524,7 @@ class System:
             
             self.__book_returned_list.append(book)
 
-        customer.book_rented -= len(result)
-        if customer.book_rented < len(result):
-            customer.book_rented = 0
+        book.customer.book_rented -= len(result)
 
         return {
             "Book Returned" : result
@@ -573,7 +564,7 @@ class System:
                 )
             
             result.append(id)
-            
+            book.customer = None
             book.change_status(ItemStatus.Available)
 
         return {

@@ -186,8 +186,8 @@ def get_transaction(phonenumber:str):
     } for transaction in customer.get_all_transaction]
 
 @app.get("/return_book",tags=["Book"])
-def return_book(phonenumber:str,book_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id")):
-    return bibliohub.return_book(phonenumber,book_id)
+def return_book(book_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id")):
+    return bibliohub.return_book(book_id)
 
 @app.get("/process_book_return",tags=["For Staff"])
 def process_return_book(no_staff : str,book_id : list[str]):
