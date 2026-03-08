@@ -295,7 +295,25 @@ class System:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"{target_time_slot} - Already Selected"
                     )
-                
+
+        all_book : list[BookInfo] = [book for book in selectitem_list if isinstance(book,BookInfo)] + [book.book_info for book in customer.get_selected_list if isinstance(book,BookOrder)]
+        
+        book_with_same_name : dict[BookInfo,int] = {}
+        
+        for book_info in all_book:
+            if book_with_same_name.get(book_info):
+                book_with_same_name[book_info] += 1
+            else:
+                book_with_same_name[book_info] = 1
+
+        for book in book_with_same_name:
+            if book_with_same_name.get(book) > book.get_nums_available():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"หนังสือ {book.name} มีไม่พอโปรดทำรายการใหม่"
+                )
+            
+
         if not customer.check_area_quota(len([request_slot for request_slot in selectitem_list if isinstance(request_slot,TimeSlot)])):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -305,7 +323,7 @@ class System:
         if not customer.check_rent_quota(len([rentbook for rentbook in selectitem_list if isinstance(rentbook,BookInfo) and rentbook.activity_type == ActivityType.Rent])):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"เช่าหนังสือโควต้าเต็ม! คุณจองได้อีก {customer.rental_quota - customer.book_rented - len([rentbook for rentbook in selectitem_list if isinstance(rentbook,BookInfo) and rentbook.activity_type == ActivityType.Rent])} เล่ม"
+                detail=f"เช่าหนังสือโควต้าเต็ม! คุณจองได้อีก {customer.rental_quota - customer.book_rented - len([rentbook for rentbook in customer.get_selected_list if isinstance(rentbook,BookOrder) and rentbook.book_info.activity_type == ActivityType.Rent])} เล่ม"
             )
         
         for item in selectitem_list:
@@ -491,7 +509,15 @@ class System:
                 customer.add_notify(notification)
                 self.__notification_list.append(notification)
 
-    def return_book(self,book_id : list[str]):
+    def return_book(self,phonenumber,book_id : list[str]):
+        customer = self.get_user_from_phone_number(phonenumber)
+
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Customer Not Found"
+            )
+
         result = []
         for id in book_id:
             type_item = self.check_type_from_id(id)
@@ -522,6 +548,11 @@ class System:
             result.append(id)
             
             self.__book_returned_list.append(book)
+
+        customer.book_rented -= len(result)
+        if customer.book_rented < len(result):
+            customer.book_rented = 0
+
         return {
             "Book Returned" : result
         }

@@ -158,7 +158,7 @@ class BookInfo:
             
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="หนังสือมีจำนวนไม่พอ"
+            detail=f"หนังสือ {self.name} มีจำนวนไม่พอ"
         )
     
 class BookOrder:
