@@ -130,7 +130,7 @@ def select(phonenumber:str,item_id:list[str],num_days:int = 0):
 @mcp.tool
 def get_all_staff():
     """แสดงข้อมูล staff ทั้งหมด แสดงเฉพาะ staff_id และข้อมูลที่ไม่ใช่ private"""
-    return bibliohub.get_staff_list
+    return [staff.info() for staff in bibliohub.get_staff_list]
 
 @mcp.tool
 def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocode:str = "xxxxxx"):

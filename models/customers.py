@@ -158,6 +158,13 @@ class Staff(Member):
         super().__init__(name, surname, phonenumber, email, birth_month)
         self.__no_staff = f"STF-{Staff.count}"
 
+    def info(self):
+        return {
+            "Name" : self.name,
+            "Surname" : self.surname,
+            "Staff No." : self.__no_staff
+        }
+
     @property
     def no_staff(self):
         return self.__no_staff
