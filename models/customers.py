@@ -1,8 +1,8 @@
 from models.transactions import Transaction, Notification
 from models.books import Book, BookInfo, BookOrder
-from models.areas import Area, TimeSlot
+from models.areas import TimeSlot
 from models.infos import ActivityType, LevelMember, BookingBookQuota, CustomerStatus, BirthMonth
-from models.orders import Purchase,UpgradeArea
+from models.orders import UpgradeArea
 class Customer:
     def __init__(self,name:str,surname:str,phonenumber:str,email:str):
         """
@@ -68,9 +68,9 @@ class Customer:
     def check_rent_quota(self,request_book_nums): 
         return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) + request_book_nums <= (self.__rental_quota - self.__book_rented)
 
-    def select(self, order: BookInfo | TimeSlot | Purchase, num_days: int = 0):
-        # เพิ่ม Purchase เข้าไปใน isinstance เพื่อให้ตะกร้ารับใบอัปเกรดได้
-        if isinstance(order, (BookInfo, TimeSlot, Purchase)):
+    def select(self, order: BookInfo | TimeSlot | UpgradeArea, num_days: int = 0):
+        # เพิ่ม UpgradeArea เข้าไปใน isinstance เพื่อให้ตะกร้ารับใบอัปเกรดได้
+        if isinstance(order, (BookInfo, TimeSlot, UpgradeArea)):
             if isinstance(order, BookInfo):
                 order = BookOrder(order, num_days)
             self.__selected_list.append(order)
