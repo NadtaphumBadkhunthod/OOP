@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from abc import ABC, abstractmethod
 
-from models.orders import Order, RentBook
+from models.orders import Order, RentBook, UpgradeArea, BookingArea
 from models.infos import PromotionType, ItemStatus, PaymentOptions, TransactionStatus, PaymentStatus, ActivityType, AreaType
 from models.books import BookOrder
 from models.areas import TimeSlot
@@ -121,6 +121,11 @@ class Payment:
     def upgrade_delta(self):
         return self.__upgrade_delta
     
+    @upgrade_delta.setter
+    def upgrade_delta(self, amount):
+        """รับยอดส่วนต่างจากการอัปเกรดเข้ามาเก็บไว้ เพื่อไปบวกใน calculate_net_amount()"""
+        self.__upgrade_delta = amount
+    
     @property
     def discount_amount(self):
         return self.__discount_amount
@@ -210,7 +215,7 @@ class Transaction:
         rent_list = [order.book_info.search_book_available().calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
         purchase_list = [order.book_info.search_book_available() for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
         area_list = {}
-
+        upgrade_list = [item for item in selected_list if isinstance(item, UpgradeArea)]
         for areatype in AreaType:
             area_in_type_list = []
             for item in selected_list:
@@ -229,13 +234,34 @@ class Transaction:
         if len(area_list) > 0:
             self.__customer.booking_reservation_time += len([timeslot for timeslot in selected_list if isinstance(timeslot,TimeSlot)])
             self.__payment.order.booking_area = area_list
+
+        if len(upgrade_list) > 0:
+            for upg in upgrade_list:
+                self.add_upgrade_order(upg)
         
-        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0):
+        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="activity type not found"
             )
         
+    
+    def get_current_booking_area(self, old_area_id: str) -> BookingArea:
+        for booking_area in self.__payment.order.booking_area:
+            if booking_area.area.area_id == old_area_id:
+                return booking_area
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"ไม่พบพื้นที่การจองเดิมรหัส {old_area_id} ใน Transaction นี้"
+        )
+    
+    def add_upgrade_order(self, upgrade_item: UpgradeArea):
+        # ยัดใส่ตะกร้า
+        self.__payment.order.add_upgrade_area(upgrade_item)
+        
+        #ส่งยอดส่วนต่างไปให้ Paymentเพื่อให้ calculate_net_amount()
+        self.__payment.upgrade_delta = upgrade_item.upgrade_delta
+    
     def get_sub_total(self):
         return self.__payment.calculate_subtotal()
         
