@@ -205,10 +205,10 @@ class Transaction:
     def order(self):
         return self.__payment.order
     
-    @order.setter
-    def order(self,selected_list : list[BookOrder | TimeSlot]):
-        rent_list = [order.book_info.search_book_available().calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
-        purchase_list = [order.book_info.search_book_available() for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
+    def make_order(self,customer : Customer):
+        selected_list : list[BookOrder | TimeSlot] = customer.get_selected_list
+        rent_list = [order.book_info.search_book_available(customer).calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
+        purchase_list = [order.book_info.search_book_available(customer) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
         area_list = {}
 
         for areatype in AreaType:

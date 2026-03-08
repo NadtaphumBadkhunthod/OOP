@@ -60,7 +60,10 @@ class Customer:
     
     @book_rented.setter
     def book_rented(self,nums_rent):
-        self.__book_rented = nums_rent
+        if self.__book_rented < nums_rent:
+            self.__book_rented = 0
+        else :
+            self.__book_rented -= nums_rent 
 
     def check_eligibility(self):
         return self.__strike < 3

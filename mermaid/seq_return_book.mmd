@@ -6,8 +6,7 @@ sequenceDiagram
     participant Book
     participant CS as Customer
 
-    Customer ->>+ System: return_book(phonenumber,book_id list[str])
-    System ->> System: get_user_from_phone_number(phonenumber)
+    Customer ->>+ System: return_book(book_id list[str])
 
     loop each id in book_id
         System ->> System: check_type_from_id(id)
@@ -40,7 +39,7 @@ sequenceDiagram
             BookStock ->>+ BookInfo: get_name()
             BookInfo -->>- BookStock: return name [str]
 
-            opt name match
+            opt name and author match
                 BookStock -->>- System: return BookInfo
             end
         end
@@ -49,6 +48,30 @@ sequenceDiagram
             System -->> Customer: return "BookInfo Not Found"
         end
 
+        System ->>+ BookInfo: get_book(id)
+        loop each Book in BookInfo
+            BookInfo ->>+ Book: get_uid()
+            Book -->>- BookInfo: return uid [str]
+        end
 
-        
+        opt uid match
+            BookInfo -->>- System: return Book
+        end
+
+        System ->>+ Book: get_status()
+        Book -->>- System: return status
+
+        opt status is not Confirm or InUse 
+            System -->> Customer : return "book is not in use"
+        end
+
+        System ->>+ Book: change_status(ItemStatus.NotAvailable)
+        Book -->>- System: return "Change status successful"
+
+        System ->>+ Book: get_customer()
+        Book -->>- System: return customer [Customer]
+
+        System ->>+ CS: decrease book_rented
+        CS -->>- System: return "decrease successful"
+        System -->>- Customer: "Return Successful"
     end
