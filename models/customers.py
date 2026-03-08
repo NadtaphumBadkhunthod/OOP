@@ -175,8 +175,8 @@ class Member(Customer):
 
 class Staff(Member):
     count = 0
-    def __init__(self, name, surname, phonenumber, email, birth_month):
-        super().__init__(name, surname, phonenumber, email, birth_month)
+    def __init__(self, customer : Customer, birth_month):
+        super().__init__(customer, birth_month)
         self.__no_staff = f"STF-{Staff.count}"
 
     def info(self):

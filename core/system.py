@@ -384,7 +384,9 @@ class System:
         if not isinstance(birth_month,BirthMonth):
             raise ValueError()
         
-        self.__staff_list.append(Staff(name,surname,phonenumber,email,birth_month))
+        customer = Customer(name,surname,phonenumber,email)
+        
+        self.__staff_list.append(Staff(customer,birth_month))
         return "Add Staff Successful"
 
     @property
