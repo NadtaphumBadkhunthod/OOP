@@ -76,6 +76,20 @@ def search_area(phonenumber: str = Query(description="เบอร์โทร�
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/upgrade_area", tags=["Booking Area"])
+def upgrade_booking_area(
+    phonenumber: str = Query(..., description="เบอร์โทรศัพท์ลูกค้า"),
+    old_area_id: str = Query(..., description="ID ของพื้นที่เดิมที่กำลังนั่งอยู่ (เช่น AREA-QUIET-1)"),
+    new_area_id: str = Query(..., description="ID ของพื้นที่ใหม่ที่ต้องการย้ายไป (เช่น AREA-PRIVATE-2)"),
+    slot_ids: list[str] = Query(default=["XX-XX-XX"], description="ID ของสล็อตเวลาใหม่ที่ต้องการ ขั้นด้วย , (เช่น AREA-PRIVATE-2-1)")
+):
+    """
+    API สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
+    ระบบจะทำการเช็คราคาและโควต้า หากผ่านจะนำใบเสนอราคาส่วนต่างใส่ตะกร้าให้โดยอัตโนมัติ
+    จากนั้นให้ลูกค้าไปเรียก API /checkout ต่อไป
+    """
+    return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, slot_ids)
+
 def format_book_info(book : BookInfo):
     return {
         "Book Name": book.name,

@@ -6,7 +6,7 @@ from models.books import Book, BookInfo, BookOrder, BookStock
 from models.areas import Area, TimeSlot
 from models.customers import Customer, Member, Staff, Manager
 from models.transactions import Promotion, Transaction, Notification
-from models.orders import Purchase
+from models.orders import Purchase,UpgradeArea
 
 class System:
     def __init__(self):
@@ -268,6 +268,16 @@ class System:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)"
+                    )
+                
+                current_time = datetime.now().time()
+                #current_time = datetime.strptime("13:00", "%H:%M").time()
+                slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
+                
+                if slot_start_time <= current_time:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})"
                     )
                 
                 if target_time_slot not in selectitem_list and target_time_slot not in customer.get_selected_list:
@@ -574,8 +584,81 @@ class System:
             
 
 
-    def upgrade_booking_area(self):
-        pass
+    def upgrade_booking_area(self, phonenumber: str, old_area_id: str, new_area_id: str, slot_ids: list[str]):
+        
+        #หา Customer
+        customer = self.get_user_from_phone_number(phonenumber)
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Customer Not Found"
+            )
+            
+        # หา Transaction ล่าสุดที่ใช้งานอยู่ (Active) เพื่อดึงของเก่า
+        active_trans = None
+        for trans in reversed(self.__transaction_list):
+            # 
+            if trans.customer == customer and trans.status == TransactionStatus.Confirm.value:
+                active_trans = trans
+                break
+                
+        if not active_trans:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ไม่พบรายการจองที่กำลังใช้งานอยู่ (No active transaction)"
+            )
+            
+        old_booking_obj = active_trans.get_current_booking_area(old_area_id)
+        
+        #ดึง Area ใหม่ และสล็อตเวลาใหม่
+        target_area = next((a for a in self.__area if a.area_id == new_area_id), None)
+        if not target_area:
+            raise HTTPException(status_code=404, detail="ไม่พบพื้นที่ใหม่ที่ต้องการอัปเกรด")
+            
+        new_slots = target_area.get_slots_by_ids(slot_ids)
+        if len(new_slots) != len(slot_ids):
+            raise HTTPException(status_code=400, detail="สล็อตเวลาบางอันไม่ถูกต้อง")
+
+        current_time = datetime.now().time()
+        #current_time = datetime.strptime("13:00", "%H:%M").time()
+        for slot in new_slots:
+            if slot.is_available != ItemStatus.Available:
+                raise HTTPException(status_code=400, detail=f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")
+            
+            # แปลงสตริง
+            slot_start_time = datetime.strptime(slot.start_time, "%H:%M").time()
+            if slot_start_time <= current_time:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, 
+                    detail=f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({slot.start_time}-{slot.end_time})"
+                )
+
+        #เช็คโควต้าเฉพาะเวลาที่บวกเพิ่ม
+        old_hours = len(old_booking_obj.get_order)
+        new_hours = len(new_slots)
+        
+        if new_hours > old_hours:
+            extra_hours = new_hours - old_hours
+            if not customer.check_area_quota(extra_hours):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"โควต้าเวลาเต็ม! คุณบวกเวลาเพิ่มได้อีกแค่ {customer.get_area_quota() - customer.booking_reservation_time} ชม."
+                )
+
+        #สร้างใบอัปเกรด
+        try:
+            upgrade_item = UpgradeArea(old_booking_obj, new_slots)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+            
+        customer.select(upgrade_item)
+        
+        print("Upgrade Area Added to Cart")
+        return {
+            "status": "Success",
+            "message": f"นำการอัปเกรดไป {target_area.area_type.value} ใส่ตะกร้าแล้ว",
+            "upgrade_fee": upgrade_item.upgrade_delta
+        }
 
     def generate_utilization_report(self):
         pass        

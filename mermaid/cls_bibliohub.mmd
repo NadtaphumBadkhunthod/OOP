@@ -247,6 +247,17 @@ direction TB
         -DateTime expiration_date
         +add_point()
     }
+    class UpgradeArea {
+        -BookingArea old_booking "รายการจองเดิม"
+        -List~TimeSlot~ new_slots "สล็อตเวลาใหม่ (อ้างอิง Area ได้จากในนี้)"
+        -Float upgrade_delta "ยอดเงินส่วนต่าง"
+        +calculate_delta() "คำนวณส่วนต่างราคา"
+        +apply_upgrade() "อัปเดตคืนสล็อตเก่า และยึดสล็อตใหม่"
+        +validate_upgrade_rules()"ตรวจสอบว่าสามารถอัพเกรดได้ไหม"
+    }
+Purchase <|-- UpgradeArea
+UpgradeArea "1" --> "1" BookingArea : old_booking
+UpgradeArea "1" o-- "1..*" TimeSlot : new_slots
 
 <<abstract>> PaymentMethod
 

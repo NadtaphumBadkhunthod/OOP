@@ -2,20 +2,20 @@ from __future__ import annotations
 from models.infos import AreaType, ItemStatus
 
 WayLaOpen = [
-    ["09:00", "10:00"],
-    ["10:00", "11:00"],
-    ["11:00", "12:00"],
-    ["12:00", "13:00"],
-    ["13:00", "14:00"],
-    ["14:00", "15:00"],
-    ["15:00", "16:00"]
+    ["09:01", "10:00"],
+    ["10:01", "11:00"],
+    ["11:01", "12:00"],
+    ["12:01", "13:00"],
+    ["13:01", "14:00"],
+    ["14:01", "15:00"],
+    ["15:01", "16:00"]
 ]
 
 class Area:
     count = 1
     def __init__(self,type : AreaType, hourly_rate, feature, capacity):
         self.__area_id : str = f"AREA-{type.value.upper()}-{self.count}"
-        self.count += 1
+        Area.count += 1
 
         self.__area_type : AreaType = type #บอกว่าเป็นareaแบบไหนเช่น qiuet area,Private Room,Meeting Room
         self.__hourly_rate : float = hourly_rate
@@ -27,12 +27,15 @@ class Area:
 
     @property
     def list_timeslot(self) -> list[TimeSlot]:
-        return [slot for slot in self.__slots if slot.is_available == "Available"]
+        return [slot for slot in self.__slots if slot.is_available == ItemStatus.Available]
 
     def create_time_slot(self):
         for time in WayLaOpen:
             start_time,end_time = time
             self.__slots.append(TimeSlot(f"{self.__area_id}-{len(self.__slots) + 1}",start_time,end_time,self))
+
+    def get_slots_by_ids(self, slot_ids: list[str]) -> list[TimeSlot]:
+        return [slot for slot in self.__slots if slot.slot_id in slot_ids]
 
     @property
     def area_id(self):
