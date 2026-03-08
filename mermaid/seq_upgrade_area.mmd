@@ -8,11 +8,11 @@ sequenceDiagram
     participant Customers as Customer
     
     Note over Customer, Trans: ลูกค้านั่งใช้งานอยู่ในระบบแล้ว (Active Transaction)
-
-    Customer->>System: upgrade_booking_area(new_area_id)
+    %% acthor requestมาที่ระบบ
+    Customer->>System: request_upgrade_area(old_area_id, new_area_id)
     activate Customer
-    
-    System->>System: search_area(new_area_id)
+    %% ระบบใช้methode upgrade_booking_area() ใน class ตัวเอง
+    System->>System: upgrade_booking_area(old_area_id, new_area_id) 
     activate System
     deactivate System
     
@@ -44,7 +44,7 @@ sequenceDiagram
         deactivate System
         
         %% ดึงข้อมูลที่นั่งเก่าออกมาเพื่อเตรียมเปรียบเทียบ
-        System->>Trans: get_current_booking_area()
+        System->>Trans: get_current_booking_area(old_area_id)
         activate Trans
         Trans-->>System: return old_booking_obj
         deactivate Trans
