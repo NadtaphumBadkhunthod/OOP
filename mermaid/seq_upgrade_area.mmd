@@ -2,55 +2,99 @@ sequenceDiagram
     autonumber
     actor Customer as Customer / Member
     participant System as BiblioHubSystem
-    participant Trans as Transaction (Existing)
-    participant BArea as BookingArea (History)
+    participant Trans as Transaction (In Use)
     participant NewArea as Area (New Type)
     participant Slot as TimeSlot
+    participant Customers as Customer
+    
     Note over Customer, Trans: ลูกค้านั่งใช้งานอยู่ในระบบแล้ว (Active Transaction)
 
-    Customer->>System: upgrade_booking_area(new_type)
-    System->>System: search_area(new_type)
-    System->>NewArea: list_timeslot()
-    NewArea-->>System: return empty area
+    Customer->>System: upgrade_booking_area(new_area_id)
+    activate Customer
     
-    alt ไม่มีพื้นที่ว่างในประเภทที่ต้องการ
-        System-->>Customer: notify_error("No available slots for this type")
-    else พบพื้นที่ว่าง
-        System->>BArea: calculate_upgrade_delta(new_area)
-        Note right of BArea: คำนวณส่วนต่างจากเวลาที่เหลือ <br/> และส่วนต่าง hourly_rate
-        BArea-->>System: return upgrade_delta
-        
-        System-->>Customer: show_upgrade_fee(upgrade_delta)
-        
-        Customer->>System: checkout()เพื่อคอนเฟิร์มที่จะอัพเกรดที่นั่ง
-        create participant Pay as Payment (Upgrade Invoice)
-        System->>Pay: create_payment(upgrade_delta)
-		Pay-->>System: return create success
-        System->>Pay: process_payment()
-        Pay-->>System: return payment_confirmed
-
-        System->>BArea: update_reserved_slots(new_slots)
-        BArea-->>System: return update success
-        
-        loop Release & Occupy
-            System->>Slot: update_slot(old_slot, is_available=True)
-            System->>Slot: update_slot(new_slot, is_available=False)
+    System->>System: search_area(new_area_id)
+    activate System
+    deactivate System
+    
+    %% ลูปค้นหาสล็อตว่าง
+    loop ค้นหา Timeslot ใน Area
+        System->>NewArea: list_timeslot(new_area_id)
+        activate System
+        loop TimeSlot ใน Area ว่าว่างหรือไม่
+            NewArea->>Slot: check is_available
+            activate NewArea
+            Slot-->>NewArea: return status
+            deactivate NewArea
         end
-		Slot-->>System :return updeate success
-        System->>Trans: add_audit_log("Upgraded to " + new_type)
-		Trans-->>System: return add success
-        System->>Trans: sync_payment_with_activity()
-		Trans-->>System: return Adjustment successful.
-        
-        System->>System:notify_user()
-        create participant Notify as Notification
-        System->>Notify: create_notify()
-        Notify-->>System: return notify obj
-        System->>Notify: send_message("Booking Success")
-        Notify-->>System: return send Success
-        System->>Customer:add_notify()
-        Customer-->>System: return add success
-        System-->>Customer: return เสร็จสิ้นการทำรายการ
-    else สิทธิ์ไม่ผ่าน หรือ มีการจองซ้อน (Failure Case)
-        System-->>Customer: notify_error("Booking Failed")
+        NewArea-->>System: return available_slots
+        deactivate System
     end
+
+    System -->> Customer : return {"area_id": area_id, "available_slots": available_slots}
+
+    Customer->>System: select_area(phonenumber, area_id, List[slot_ids])
+    System->>System: get_user_from_phone_number(phonenumber)
+    
+    %% เช็คเวลาที่บวกเพิ่มว่าเกินโควต้าไหม
+    System->>Customers: check_quota(phonenumber)
+    activate System
+    
+    alt โควต้าผ่าน (Success Case)
+        Customers-->>System: return quota[True]
+        deactivate System
+        
+        %% ดึงข้อมูลที่นั่งเก่าออกมาเพื่อเตรียมเปรียบเทียบ
+        System->>Trans: get_current_booking_area()
+        activate Trans
+        Trans-->>System: return old_booking_obj
+        deactivate Trans
+        
+        create participant UArea as UpgradeArea
+        System->>UArea: create(old_booking_obj, new_slots)
+        activate UArea
+        
+        %% ตรวจสอบเงื่อนไขการอัปเกรด (ราคาต้องแพงกว่าเดิม)
+        UArea->>UArea: validate_upgrade_rules()
+        
+        alt ราคาที่ใหม่ <= ราคาที่เดิม (Upgrade Failed)
+            UArea-->>System: throw Error("Upgrade rate must be higher")
+            System-->>Customer: return {"error": "ไม่สามารถอัปเกรดไปพื้นที่ราคาเท่าเดิมหรือถูกกว่าได้"}
+        else ราคาที่ใหม่แพงกว่า (Upgrade Allowed)
+            UArea->>UArea: calculate_delta()
+            Note right of UArea: แยกคิดเงิน: <br/>1. ส่วนต่างสำหรับเวลาที่เหลือ<br/>2. ราคาเต็มสำหรับเวลาที่จองเพิ่ม
+            UArea-->>System: return UArea_obj (พร้อมยอดส่วนต่าง)
+            deactivate UArea
+            
+            %% จบที่การนำใส่ตะกร้า
+            System->>Customers: add_to_selected_list(UArea_obj)
+            activate Customers
+            Customers-->>System: return add_success
+            deactivate Customers
+            
+            System-->>Customer: show_upgrade_fee(UArea_obj.upgrade_delta)
+            
+            %% เรียกใช้ Checkout Flow 
+            Customer->>System: checkout(phonenumber, staff, payment_method)
+            
+            Note over Customer,System: Execute Checkout Sequence Diagram
+            
+            %%สิ่งที่ต้องทำหลัง Checkout สำเร็จ 
+            System->>UArea: apply_upgrade()
+            activate UArea
+            loop Release & Occupy
+                UArea->>Slot: update_slot(old_slot, is_available=True)
+                UArea->>Slot: update_slot(new_slot, is_available=False)
+            end
+            Slot-->>UArea: return success
+            UArea-->>System: return apply success
+            deactivate UArea
+            
+            System->>Trans: add_audit_log("Upgraded Area to " + new_type)
+            System-->>Customer: return อัปเกรดเสร็จสมบูรณ์
+        end
+        
+    else สิทธิ์ไม่ผ่าน หรือ มีการจองซ้อน (Failure Case)
+        System-->>Customer: return {"error": f"โควต้าเต็ม! หรือไม่สามารถอัปเกรดได้"}
+    end
+    
+    deactivate Customer
