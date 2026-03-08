@@ -1,0 +1,30 @@
+sequenceDiagram
+    actor Customer
+    participant System as BiblioHub
+    participant CS as Customer
+    participant BookStock
+    participant BookInfo
+    participant Book
+
+    Customer ->>+ System: return_book(phonenumber,book_id list[str])
+    System ->> System: get_user_from_phone_number(phonenumber)
+
+    loop each id in book_id
+        System ->> System: check_type_from_id(id)
+
+        opt Type not Book
+            System -->- Customer: return "Need to return a book only" [str]
+        end
+
+        System ->> System: get_data_from_id(type_of_item,id)
+        System ->> System: get_book_info(series,book_name,author,activity_type)
+
+        loop each BookStock in System
+            System ->>+ BookStock: get_name()
+            BookStock -->>- System: return name [str]
+
+            opt series match
+                
+            end
+        end
+    end
