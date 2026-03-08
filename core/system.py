@@ -168,28 +168,10 @@ class System:
     def get_all_book(self):
         return self.__book_stock
     
-    def search_book_by_series(self,series):
+    def get_book_stock(self,series):
         for bookstock in self.__book_stock:
             if bookstock.name == series:
-                return bookstock.get_book_list(ActivityType.All)
-
-    def get_book_info(self,series : str,book_name : str,author : str,activity_type : ActivityType) -> BookInfo:
-        for bookstock in self.__book_stock:
-            if bookstock.name == series:
-                return bookstock.get_book_info_by_name(book_name,author,activity_type)
-        
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Book Series Not Found"
-        )
-    
-    def get_book(self,book_series,bookname,author,activity_type,book_id) -> Book | None:
-            for bookstock in self.__book_stock:
-                if bookstock.name == book_series:
-                    for book in self.get_book_info(book_series,bookname,author,activity_type).book_list:
-                        if book.uid == book_id:
-                            return book
-            return None
+                return bookstock
 
     def check_type_from_id(self,item_id:str) -> str:
         if item_id.startswith("BK"):
@@ -224,7 +206,7 @@ class System:
         else:
             raise ValueError("Invalid ID format")
         
-    def search_area(self,customer,area_id):
+    def search_area(self,customer : Customer,area_id):
         if not customer.check_eligibility():
                 raise PermissionError("Not come in to my place go away don't comeback")
         
@@ -252,7 +234,7 @@ class System:
             if type_of_item == ItemType.Book:
                 activity_type,series,book_name,author = self.get_data_from_id(type_of_item,id)
 
-                book_info = self.get_book_info(series,book_name,author,activity_type)
+                book_info = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type)
 
                 if not book_info:
                     raise HTTPException(
@@ -529,7 +511,7 @@ class System:
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
-            book = self.get_book(series,book_name,author,activity_type,id)
+            book = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type).get_book(id)
 
             if not book:
                 raise HTTPException(
@@ -576,7 +558,7 @@ class System:
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
-            book = self.get_book(series,book_name,author,activity_type,id)
+            book = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type).get_book(id)
 
             if not book:
                 raise HTTPException(

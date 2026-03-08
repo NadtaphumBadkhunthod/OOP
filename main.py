@@ -101,7 +101,7 @@ def get_all_book_series():
 
 @app.get("/search_book_by_series",tags=["Book"])
 def search_book_by_series(series : str):
-    result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.search_book_by_series(series)
+    result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.get_book_stock(series).get_book_list(ActivityType.All)
     
     if not result:
         return "Series Not Found"

@@ -149,6 +149,11 @@ class BookInfo:
                 count += 1
 
         return count
+    
+    def get_book(self,book_id):
+        for book in self.book_list:
+            if book.uid == book_id:
+                return book
 
     def search_book_available(self):
         for book in self.__book:
