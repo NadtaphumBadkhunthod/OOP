@@ -216,16 +216,26 @@ class Transaction:
         purchase_list = [order.book_info.search_book_available() for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
         area_list = {}
         upgrade_list = [item for item in selected_list if isinstance(item, UpgradeArea)]
+
+        current_time = datetime.now().time()
+        
         for areatype in AreaType:
             area_in_type_list = []
             for item in selected_list:
                 if isinstance(item,TimeSlot):
+                    # แปลงเวลามาเช็ค
+                    slot_start_time = datetime.strptime(item.start_time, "%H:%M").time()
+                    if slot_start_time <= current_time:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"สล็อตเวลา {item.start_time}-{item.end_time} ผ่านไปแล้ว ไม่สามารถชำระเงินได้"
+                        )
+                        
                     if item.area.area_type == areatype:
                         area_in_type_list.append(item)
             
             if len(area_in_type_list) > 0:
                 area_list[areatype] = area_in_type_list
-        
         if len(rent_list) > 0:
             self.__customer.book_rented += len(rent_list) 
             self.__payment.order.rent_book = rent_list

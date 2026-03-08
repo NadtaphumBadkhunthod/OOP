@@ -288,6 +288,16 @@ class System:
                         detail=f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)"
                     )
                 
+                current_time = datetime.now().time()
+                #current_time = datetime.strptime("13:00", "%H:%M").time()
+                slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
+                
+                if slot_start_time <= current_time:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})"
+                    )
+                
                 if target_time_slot not in selectitem_list and target_time_slot not in customer.get_selected_list:
                     selectitem_list.append(timeslot)
                 else:
@@ -636,8 +646,8 @@ class System:
         if len(new_slots) != len(slot_ids):
             raise HTTPException(status_code=400, detail="สล็อตเวลาบางอันไม่ถูกต้อง")
 
-        
-        current_time = datetime.strptime("13:00", "%H:%M").time()
+        current_time = datetime.now().time()
+        #current_time = datetime.strptime("13:00", "%H:%M").time()
         for slot in new_slots:
             if slot.is_available != ItemStatus.Available:
                 raise HTTPException(status_code=400, detail=f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")
