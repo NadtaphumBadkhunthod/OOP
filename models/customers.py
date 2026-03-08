@@ -29,10 +29,26 @@ class Customer:
     @property
     def get_all_transaction(self) -> list[Transaction]:
         return self.__transaction 
+    
+    @get_all_transaction.setter
+    def all_transaction(self,list_transaction : list[Transaction]):
+        self.__transaction = list_transaction
 
     @property
     def get_selected_list(self):
         return self.__selected_list
+    
+    @get_selected_list.setter
+    def selected_list(self,new_selected_list):
+        self.__selected_list = new_selected_list
+
+    @property
+    def get_all_notification(self):
+        return self.__notification_list
+    
+    @get_all_notification.setter
+    def all_notification(self,list_notification):
+        self.__notification_list = list_notification
     
     @property
     def name(self):
@@ -71,8 +87,8 @@ class Customer:
     def check_rent_quota(self,request_book_nums): 
         return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) + request_book_nums + self.__book_rented <= self.__rental_quota
 
-    def select(self,order : BookInfo | TimeSlot,num_days : int = 0) -> str | BookInfo | Area:
-        if isinstance(order,(BookInfo,TimeSlot)):
+    def select(self,order : BookOrder | BookInfo | TimeSlot,num_days : int = 0) -> str | BookInfo | Area:
+        if isinstance(order,(BookOrder,BookInfo,TimeSlot)):
             if isinstance(order,BookInfo):
                 order = BookOrder(order,num_days)
             self.__selected_list.append(order)
@@ -127,12 +143,17 @@ class Customer:
         return total_usage <= self.get_area_quota()
 
 class Member(Customer):
-    def __init__(self, name, surname, phonenumber, email, birth_month : BirthMonth):
-        super().__init__(name, surname, phonenumber, email)
+    def __init__(self,customer : Customer, birth_month : BirthMonth):
+        super().__init__(customer.name, customer.surname, customer.phonenumber, customer.email)
 
         self.__level_member = LevelMember.Silver
         self.__birth_month = birth_month
         self.__points = 0
+
+        self.all_transaction = customer.get_all_transaction
+        self.selected_list = customer.get_selected_list
+        self.all_notification = customer.get_all_notification
+
         self.__booking_book_quota = BookingBookQuota.Silver
         self.__status = CustomerStatus.Good
 

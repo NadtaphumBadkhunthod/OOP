@@ -1,7 +1,6 @@
 from __future__ import annotations
 from models.infos import ItemStatus, TypeBook, ActivityType
 from datetime import date, datetime, timedelta
-from fastapi import HTTPException, status
 
 from typing import TYPE_CHECKING
 
@@ -176,10 +175,7 @@ class BookInfo:
                 book.change_status(ItemStatus.InProcess)
                 return book
             
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"หนังสือ {self.name} มีจำนวนไม่พอ"
-        )
+        raise ValueError(f"หนังสือ {self.name} มีจำนวนไม่พอ")
     
 class BookOrder:
     def __init__(self,book_info : BookInfo,nums_date):
@@ -223,27 +219,18 @@ class BookStock:
         for book_info in self.get_book_list(activity_type):
             if book_info.name == bookname and book_info.author == author:
                 return book_info
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Book name or Author Not Found"
-        )
+        raise ValueError("Book name or Author Not Found")
 
     def add_book_info(self,book_info:BookInfo,activity_type:ActivityType):
         if not isinstance(book_info,BookInfo):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Not a right book info"
-            )
+            raise ValueError("Not a right book info")
         
         if activity_type.value == "Rent":
             self.__rent_book_list.append(book_info)
         elif activity_type.value == "Purchase":
             self.__forsale_book_list.append(book_info)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Not a right activity type"
-            )
+            raise ValueError("Not a right activity type")
         
         
     def remove_book(self,book):

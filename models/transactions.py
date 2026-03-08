@@ -1,5 +1,4 @@
 from __future__ import annotations
-from fastapi import HTTPException, status
 import uuid
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -29,11 +28,8 @@ class Promotion:
         if isinstance(customer,Customer):
             if self.type == PromotionType.BirthMonth:
                 if not isinstance(customer,Member):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="This Promotion Need to be used by Member only"
-                    )
-                
+                    raise ValueError("This Promotion Need to be used by Member only")
+            
             return customer not in self.__used_user and promocode == self.__promo_code
         
     def apply_discount(self,price,customer,promocode):
@@ -43,10 +39,7 @@ class Promotion:
                     if self.is_eligible(customer,promocode):
                         self.__used_user.append(customer)
                         return self.calculate_discount(customer,price)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Promotion is not Available"
-        )
+        raise ValueError("Promotion is not Available")
 
     def change_stauts(self,status : ItemStatus):
         self.__status = status
@@ -74,10 +67,7 @@ class Payment:
         elif payment_method == PaymentOptions.qr_code:
             self.__payment_method = QRCode(self.__customer.phonenumber)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Payment Options Not Found : {payment_method} {type(payment_method)}"
-            )
+            raise ValueError(f"Payment Options Not Found : {payment_method} {type(payment_method)}")
         
         self.__base_fee = 10 # เท่าไหร่อ่ะ need implement
         self.__upgrade_delta = 0
@@ -231,10 +221,7 @@ class Transaction:
             self.__payment.order.booking_area = area_list
         
         if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="activity type not found"
-            )
+            raise ValueError("activity type not found")
         
     def get_sub_total(self):
         return self.__payment.calculate_subtotal()
