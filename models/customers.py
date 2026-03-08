@@ -69,7 +69,7 @@ class Customer:
         return self.__strike < 3
     
     def check_rent_quota(self,request_book_nums): 
-        return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) + request_book_nums <= (self.__rental_quota - self.__book_rented)
+        return len([selected for selected in self.__selected_list if isinstance(selected,BookOrder) and selected.book_info.activity_type == ActivityType.Rent]) + request_book_nums + self.__book_rented <= self.__rental_quota
 
     def select(self,order : BookInfo | TimeSlot,num_days : int = 0) -> str | BookInfo | Area:
         if isinstance(order,(BookInfo,TimeSlot)):
