@@ -216,10 +216,7 @@ class Transaction:
                     # แปลงเวลามาเช็ค
                     slot_start_time = datetime.strptime(item.start_time, "%H:%M").time()
                     if slot_start_time <= current_time:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"สล็อตเวลา {item.start_time}-{item.end_time} ผ่านไปแล้ว ไม่สามารถชำระเงินได้"
-                        )
+                        raise ValueError(f"สล็อตเวลา {item.start_time}-{item.end_time} ผ่านไปแล้ว ไม่สามารถชำระเงินได้")
                         
                     if item.area.area_type == areatype:
                         area_in_type_list.append(item)

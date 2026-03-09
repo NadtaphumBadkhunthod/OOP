@@ -247,10 +247,7 @@ class System:
                 slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
                 
                 if slot_start_time <= current_time:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})"
-                    )
+                    raise ValueError(f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})")
                 
                 if target_time_slot not in selectitem_list and target_time_slot not in customer.get_selected_list:
                     selectitem_list.append(timeslot)
@@ -518,10 +515,7 @@ class System:
         #หา Customer
         customer = self.get_user_from_phone_number(phonenumber)
         if not customer:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Customer Not Found"
-            )
+            raise ValueError("Customer Not Found")
             
         # หา Transaction ล่าสุดที่ใช้งานอยู่ (Active) เพื่อดึงของเก่า
         active_trans = None
@@ -532,35 +526,29 @@ class System:
                 break
                 
         if not active_trans:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ไม่พบรายการจองที่กำลังใช้งานอยู่ (No active transaction)"
-            )
+            raise ValueError("ไม่พบรายการจองที่กำลังใช้งานอยู่ (No active transaction)")
             
         old_booking_obj = active_trans.get_current_booking_area(old_area_id)
         
         #ดึง Area ใหม่ และสล็อตเวลาใหม่
         target_area = next((a for a in self.__area if a.area_id == new_area_id), None)
         if not target_area:
-            raise HTTPException(status_code=404, detail="ไม่พบพื้นที่ใหม่ที่ต้องการอัปเกรด")
+            raise ValueError("ไม่พบพื้นที่ใหม่ที่ต้องการอัปเกรด")
             
         new_slots = target_area.get_slots_by_ids(slot_ids)
         if len(new_slots) != len(slot_ids):
-            raise HTTPException(status_code=400, detail="สล็อตเวลาบางอันไม่ถูกต้อง")
-
+            raise ValueError("สล็อตเวลาบางอันไม่ถูกต้อง")
+        
         current_time = datetime.now().time()
         #current_time = datetime.strptime("13:00", "%H:%M").time()
         for slot in new_slots:
             if slot.is_available != ItemStatus.Available:
-                raise HTTPException(status_code=400, detail=f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")
+                raise ValueError(f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")
             
             # แปลงสตริง
             slot_start_time = datetime.strptime(slot.start_time, "%H:%M").time()
             if slot_start_time <= current_time:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, 
-                    detail=f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({slot.start_time}-{slot.end_time})"
-                )
+                raise ValueError(f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({slot.start_time}-{slot.end_time})")
 
         #เช็คโควต้าเฉพาะเวลาที่บวกเพิ่ม
         old_hours = len(old_booking_obj.get_order)
@@ -569,16 +557,13 @@ class System:
         if new_hours > old_hours:
             extra_hours = new_hours - old_hours
             if not customer.check_area_quota(extra_hours):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"โควต้าเวลาเต็ม! คุณบวกเวลาเพิ่มได้อีกแค่ {customer.get_area_quota() - customer.booking_reservation_time} ชม."
-                )
+                raise ValueError(f"โควต้าเวลาเต็ม! คุณบวกเวลาเพิ่มได้อีกแค่ {customer.get_area_quota() - customer.booking_reservation_time} ชม.")
 
         #สร้างใบอัปเกรด
         try:
             upgrade_item = UpgradeArea(old_booking_obj, new_slots)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise ValueError(str(e))
             
         customer.select(upgrade_item)
         

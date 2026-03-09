@@ -75,12 +75,12 @@ def search_area(phonenumber: str, area_id : str):
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/upgrade_area", tags=["Booking Area"])
+@mcp.tool
 def upgrade_booking_area(
-    phonenumber: str = Query(..., description="เบอร์โทรศัพท์ลูกค้า"),
-    old_area_id: str = Query(..., description="ID ของพื้นที่เดิมที่กำลังนั่งอยู่ (เช่น AREA-QUIET-1)"),
-    new_area_id: str = Query(..., description="ID ของพื้นที่ใหม่ที่ต้องการย้ายไป (เช่น AREA-PRIVATE-2)"),
-    slot_ids: list[str] = Query(default=["XX-XX-XX"], description="ID ของสล็อตเวลาใหม่ที่ต้องการ ขั้นด้วย , (เช่น AREA-PRIVATE-2-1)")
+    phonenumber: str,
+    old_area_id: str,
+    new_area_id: str,
+    slot_ids: list[str]
 ):
     """
     API สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
