@@ -1,26 +1,17 @@
 from __future__ import annotations
-from fastapi import FastAPI, Query
-from fastapi.responses import RedirectResponse
-from fastmcp import FastMCP
 from datetime import datetime, date
-import uvicorn
+
+from fastmcp import FastMCP
 
 from models.infos import BirthMonth, PaymentOptions, ActivityType, PromotionType
 from models.books import BookInfo, TypeBook
 from datebase.init_data import mock_data
 
 bibliohub = mock_data()
-
-# app = FastAPI()
-mcp = FastMCP()
-
-# @app.get("/")
-def redirect_to_docs():
-    return RedirectResponse(url="/docs")
+mcp = FastMCP("Demo")
 
 @mcp.tool
-# @app.get("/create_customer",tags=["Main"])
-def create_customer(name:str = Query(description="ชื่อจริงลูกค้า"),surname:str = Query(description="นามสกุลลูกค้า"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์ลูกค้า"),email:str = Query(description="อีเมลลูกค้า")):
+def create_customer(name:str ,surname:str ,phonenumber:str,email:str):
     """
         สร้างบัญชีสำหรับลูกค้าใหม่
         name : ชื่อจริงลูกค้า
@@ -32,7 +23,12 @@ def create_customer(name:str = Query(description="ชื่อจริงลู
         "Result Customer" :  bibliohub.add_customer(name,surname,phonenumber,email)
     }
 
-# @app.get("/create_staff",tags=["Main"])
+def register(phonenumber:str,birth_month: BirthMonth):
+    """สมัครจาก Customer ปกติกลายเป็น Member"""
+    return {
+        "Result register" : bibliohub.register(bibliohub.get_user_from_phone_number(phonenumber),birth_month)
+    }
+
 @mcp.tool
 def create_staff(name:str = Query(description="ชื่อจริงพนักงาน"),surname:str = Query(description="นามสกุลพนักงาน"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์พนักงาน"),email:str = Query(description="อีเมลพนักงาน"),birth_month:BirthMonth = Query(description="เดือนเกิดพนักงาน")):
     """
@@ -47,7 +43,6 @@ def create_staff(name:str = Query(description="ชื่อจริงพนั
         "Result Staff" : bibliohub.add_staff(name,surname,phonenumber,email,birth_month)
     }
 
-# @app.get("/create_promotion",tags=["Main"])
 @mcp.tool
 def create_promotion(type : PromotionType,promocode : str,discount_rate : float):
     """
@@ -58,7 +53,6 @@ def create_promotion(type : PromotionType,promocode : str,discount_rate : float)
     """
     return  bibliohub.add_promotion(type,promocode,discount_rate)
 
-# @app.get("/add_or_create_book",tags=["Book"])
 @mcp.tool
 def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,number_of_copies:int,available_date = Query(default=date.today().strftime("%d/%m/%Y"),description="วัน/เดือน/ปี (เช่น 01/02/2026)")):
     """
@@ -74,7 +68,6 @@ def create_book(book_name:str,series:str,author:str,category:TypeBook,price:floa
     """
     return bibliohub.add_book(book_name,series,author,category,price,activity_type,number_of_copies,datetime.strptime(available_date, "%d/%m/%Y").date())
 
-# @app.get("/all_area", tags=["Booking Area"])
 @mcp.tool
 def read_all_areas():
     """
@@ -104,11 +97,8 @@ def read_all_areas():
         "areas_catalog": all_areas
     }
 
-# @app.get("/area/search", tags=["Booking Area"])
 @mcp.tool
-def search_area(phonenumber: str = Query(description="เบอร์โทรศัพท์ลูกค้า (เช่น 812345678)"), 
-                area_id = Query(..., description="เลือกพื้นที่ที่ต้องการจอง")):
-
+def search_area(phonenumber: str, area_id : str):
     """
         ค้นหาพื้นที่เพื่อให้ดูว่ามี ช่วงเวลาไหนว่างบ้าง สำหรับแต่ละพื้นที่
     """
@@ -118,25 +108,24 @@ def search_area(phonenumber: str = Query(description="เบอร์โทร�
         return {"error": "ไม่พบผู้ใช้ในระบบ"}
         
     try:
-        available_slots = bibliohub.search_area(customer, area_id.value)
+        available_slots = bibliohub.search_area(customer, area_id)
         return {"area_id": area_id, "available_slots": available_slots}
     except Exception as e:
         return {"error": str(e)}
 
-# @app.get("/upgrade_area", tags=["Booking Area"])
 @mcp.tool
 def upgrade_booking_area(
-    phonenumber: str = Query(..., description="เบอร์โทรศัพท์ลูกค้า"),
-    old_area_id: str = Query(..., description="ID ของพื้นที่เดิมที่กำลังนั่งอยู่ (เช่น AREA-QUIET-1)"),
-    new_area_id: str = Query(..., description="ID ของพื้นที่ใหม่ที่ต้องการย้ายไป (เช่น AREA-PRIVATE-2)"),
-    slot_ids: list[str] = Query(default=["XX-XX-XX"], description="ID ของสล็อตเวลาใหม่ที่ต้องการ ขั้นด้วย , (เช่น AREA-PRIVATE-2-1)")
+    phonenumber: str,
+    old_area_id: str,
+    new_area_id: str,
+    new_slot_ids: list[str]
 ):
     """
-    สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
+    สำหรับส่งคำร้องขออัปเกรดพื้นที่
     ระบบจะทำการเช็คราคาและโควต้า หากผ่านจะนำใบเสนอราคาส่วนต่างใส่ตะกร้าให้โดยอัตโนมัติ
     จากนั้นให้ลูกค้าไปเรียก checkout ต่อไป
     """
-    return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, slot_ids)
+    return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, new_slot_ids)
 
 def format_book_info(book : BookInfo):
     is_booking = book.activity_type.value == "Booking"
@@ -150,7 +139,6 @@ def format_book_info(book : BookInfo):
         "Book Incoming" : available_nums
     }
 
-# @app.get("/get_all_book_series",tags=["Book"])
 @mcp.tool
 def get_all_book_series():
     """
@@ -171,17 +159,16 @@ def get_all_book_series():
         "All Book Series" : respond
     }
 
-# @app.get("/search_book_by_series",tags=["Book"])
 @mcp.tool
 def search_book_by_series(series : str):
     """
         แสดงผลหนังสือจาก ซีรีย์
+        หาหนังสือด้วย ซีรีย์ของหนังสือเล่มนั้น (เช่น Naruto มี 10 ภาค ในนี้ก็จะใส่มาเป็น Naruto)
     """
     result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.search_book_by_series(series)
     
     if not result:
         return "Series Not Found"
-    
     
     book_for_rent, book_for_sales, book_for_booking = result
 
@@ -191,13 +178,11 @@ def search_book_by_series(series : str):
             "book id : ": book.id,
             "book available : ": book.get_nums_available()
         } for book in book_for_rent],
-        
         "Book for sales": [{
             "name : ": book.name,
             "book id : ": book.id,
             "book available : ": book.get_nums_available()
         } for book in book_for_sales],
-        
         "Book for booking": [{
             "name : ": book.name,
             "book id : ": book.id,
@@ -206,9 +191,8 @@ def search_book_by_series(series : str):
         } for book in book_for_booking]
     }
 
-# @app.get("/select",tags=["Select"])
 @mcp.tool
-def select(phonenumber:str,item_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
+def select(phonenumber:str,item_id:list[str],num_days:int):
     """
         เลือกสินค้า ไม่ว่าจะหนังสือ หรือพื้นที่
         หากต้องการสินค้า 3 ชิ้น 
@@ -217,7 +201,6 @@ def select(phonenumber:str,item_id:list[str] = Query(default=["XX-XX-XX"],descri
     """
     return bibliohub.select(phonenumber,item_id,num_days)
 
-# @app.get("/get_all_staff",tags=["Checkout"])
 @mcp.tool
 def get_all_staff():
     """
@@ -225,9 +208,8 @@ def get_all_staff():
     """
     return bibliohub.get_staff_list
 
-# @app.get("/checkout",tags=["Checkout"])
 @mcp.tool
-def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:PaymentOptions = Query(description="วิธีการชำระเงิน"),promocode:str = Query(default="xxxxxx",description="รหัสโปรโมชั่น")):
+def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocode:str):
     """
         จ่ายเงิน หลังจากทำรายการอื่นๆ มาแล้ว
     """
@@ -257,7 +239,6 @@ def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพ�
         }
     }
 
-# @app.get("/get_transaction",tags=["Main"])
 @mcp.tool
 def get_transaction(phonenumber:str):
     """
@@ -289,15 +270,13 @@ def get_transaction(phonenumber:str):
         }
     } for transaction in customer.get_all_transaction]
 
-# @app.get("/return_book",tags=["Book"])
 @mcp.tool
-def return_book(phonenumber:str,book_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id")):
+def return_book(book_id:list[str]):
     """
         สำหรับให้ลูกค้าคืนหนังสือ
     """
-    return bibliohub.return_book(phonenumber,book_id)
+    return bibliohub.return_book(book_id)
 
-# @app.get("/process_book_return",tags=["For Staff"])
 @mcp.tool
 def process_return_book(no_staff : str,book_id : list[str]):
     """
@@ -306,5 +285,4 @@ def process_return_book(no_staff : str,book_id : list[str]):
     return bibliohub.process_return_book(no_staff,book_id)
 
 if __name__ == "__main__":
-    # uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
     mcp.run()
