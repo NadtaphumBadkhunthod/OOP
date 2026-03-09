@@ -7,61 +7,38 @@ sequenceDiagram
     participant AreaObj as Area
     participant Slot as TimeSlot    
 
-    Customer->>System: search_area(phonenumber,area_id)
-    activate Customer
-    loop check_eligibility ใน Customers
-        System->>Customers: check_eligibility(phonenumber)
-        activate System
-        Customers-->>System: return ประวัติดี
-        deactivate System
-    end
-    loop ค้นหา Timeslot ใน area
-        System->>AreaObj: list_timeslot(area_id)
-        activate System
-        loop  TimeSlot ใน Area ว่าว่างหรือไม่
-            AreaObj->>Slot: check is_available
-            activate AreaObj
-            Slot-->>AreaObj: return status
-            deactivate AreaObj
-        end
-        AreaObj-->>System: return available_slots
-        deactivate System
-        
-    end
-
-    System-->>Customer: return {"area_id": area_id, "available_slots": available_slots}
-    deactivate Customer
-
     %% Select Area and Slot
     Customer->>System: select_area(phonenumber,area_id,List[slot_ids])
-    activate Customer
-    System->>System: get_user_from_phone_number(phonenumber)
-    System->>Customers: check_quota(phonenumber)
     activate System
+    System->>System: get_user_from_phone_number(phonenumber)
+    
+    System->>Customers: check_quota(phonenumber)
+    activate Customers
+    
     alt โควต้าผ่าน (Success Case)
         Customers-->>System: return quota[True]
-        deactivate System
+        deactivate Customers
         System-->>Customer: return {"status": "Success", "message": f"นำสล็อต {slot_names} ของ {area_id.value} ใส่ตะกร้าแล้ว"}
-        deactivate Customer
     else สิทธิ์ไม่ผ่าน หรือ มีการจองซ้อน (Failure Case)
         System-->>Customer: return {"error": f"โควต้าเต็ม! คุณจองได้อีก {customer.get_area_quota() - customer.booking_reservation_time} ชม."}
-        
     end
+    deactivate System
+
+    %% Checkout Area
     Customer->>System: checkout_area(phonenumber,payment_method)
-    activate Customer
+    activate System
     loop เช็คว่ามี Area ใน attribute selected_list ในตัว customer
         alt มี area ใน customer (Success Case)
             create participant BArea as BookingArea
-            System->>BArea:create_booking_area(all_slots, the_room)
-            activate System
-            BArea -->>System:return booking_area_obj
-            deactivate System
-            System->>System:checkout(customer, Staff(), [booking_order], payment_method)
-            activate System
-            deactivate System
-            System-->>Customer:return ทำรายการสำเร็จ ชำระเงินรวมทั้งสิ้น net_amount บาท
-            deactivate Customer
+            System->>BArea: create_booking_area(all_slots, the_room)
+            activate BArea
+            BArea -->>System: return booking_area_obj
+            deactivate BArea
+            
+            System->>System: checkout(customer, Staff(), [booking_order], payment_method)
+            System-->>Customer: return ทำรายการสำเร็จ ชำระเงินรวมทั้งสิ้น net_amount บาท
         else ไม่มี area ใน customer (Failure Case)
             System-->>Customer: return ไม่มีรายการจองที่นั่ง
         end
     end
+    deactivate System
