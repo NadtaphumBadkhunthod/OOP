@@ -17,6 +17,12 @@ def create_customer(name:str ,surname:str ,phonenumber:str,email:str):
         "Result Customer" :  bibliohub.add_customer(name,surname,phonenumber,email)
     }
 
+def register(phonenumber:str,birth_month: BirthMonth):
+    """สมัครจาก Customer ปกติกลายเป็น Member"""
+    return {
+        "Result register" : bibliohub.register(bibliohub.get_user_from_phone_number(phonenumber),birth_month)
+    }
+
 @mcp.tool
 def create_staff(name:str,surname:str,phonenumber:str,email:str,birth_month:BirthMonth):
     """สร้าง object ของ staff ขึ้นมา"""
@@ -83,9 +89,9 @@ def upgrade_booking_area(
     slot_ids: list[str]
 ):
     """
-    API สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
+    สำหรับส่งคำร้องขออัปเกรดพื้นที่
     ระบบจะทำการเช็คราคาและโควต้า หากผ่านจะนำใบเสนอราคาส่วนต่างใส่ตะกร้าให้โดยอัตโนมัติ
-    จากนั้นให้ลูกค้าไปเรียก API /checkout ต่อไป
+    จากนั้นให้ลูกค้าไปเรียก checkout ต่อไป
     """
     return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, slot_ids)
 
@@ -138,12 +144,12 @@ def search_book_by_series(series : str):
 
 @mcp.tool
 def select(phonenumber:str,item_id:list[str],num_days:int = 0):
-    """เลือกหนังสือหรือพื้นที่ไปเก็บไว้ใน object ของลูกค้า เพื่อนำไปจ่ายเงินต่อไป"""
+    """เลือกหนังสือหรือพื้นที่ไปเก็บไว้ใน object ของลูกค้า เพื่อนำไปจ่ายเงินต่อไป ลูกค้าปกติจะเช่าหนังสือได้ 4 เท่านั้น และต้องรอคืนถึงจะเช่าต่อได้"""
     return bibliohub.select(phonenumber,item_id,num_days)
 
 @mcp.tool
 def get_all_staff():
-    """แสดงข้อมูล staff ทั้งหมด แสดงเฉพาะ staff_id และข้อมูลที่ไม่ใช่ private"""
+    """แสดงข้อมูลของ staff """
     return [staff.info() for staff in bibliohub.get_staff_list]
 
 @mcp.tool
