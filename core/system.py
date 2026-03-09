@@ -49,10 +49,11 @@ class System:
             raise ValueError("Validation Fail")
         
         if (self.check_duplicate_account(phonenumber)):
-            raise IndexError()
-        self.__customer_list.append(Customer(name,surname,phonenumber,email))
-        return "Add customer successful"
-
+            raise ValueError("Duplicate Account")
+        customer = Customer(name,surname,phonenumber,email)
+        self.__customer_list.append(customer)
+        return customer
+    
     def delete_customer(self,customer):
         if isinstance(customer,Customer):
             self.__customer_list.remove(customer)
@@ -180,6 +181,8 @@ class System:
                 activity_type = ActivityType.Rent
             elif activity_type == ActivityType.Purchase.value:
                 activity_type = ActivityType.Purchase
+            elif activity_type == ActivityType.Booking.value:
+                activity_type = ActivityType.Booking
             else:
                 raise ValueError("Activity Type Not Found")
             return activity_type,series,book_name,author
@@ -266,7 +269,10 @@ class System:
                 book_with_same_name[book_info] = 1
 
         for book in book_with_same_name:
-            if book_with_same_name.get(book) > book.get_nums_available():
+            if book.activity_type.value == "Booking":
+                if hasattr(book, 'get_nums_incoming') and book_with_same_name.get(book) > book.get_nums_incoming():
+                    raise ValueError(f"หนังสือ {book.name} (ที่กำลังเข้ามา) มีจำนวนไม่พอให้จอง")
+            elif book_with_same_name.get(book) > book.get_nums_available():
                 raise ValueError(f"หนังสือ {book.name} มีไม่พอโปรดทำรายการใหม่")
             
 
@@ -276,6 +282,14 @@ class System:
         if not customer.check_rent_quota(len([rentbook for rentbook in selectitem_list if isinstance(rentbook,BookInfo) and rentbook.activity_type == ActivityType.Rent])):
             raise ValueError(f"เช่าหนังสือโควต้าเต็ม! คุณจองได้อีก {customer.rental_quota - customer.book_rented - len([rentbook for rentbook in customer.get_selected_list if isinstance(rentbook,BookOrder) and rentbook.book_info.activity_type == ActivityType.Rent])} เล่ม")
         
+        booking_items = [book for book in selectitem_list if isinstance(book, BookInfo) and book.activity_type == ActivityType.Booking]
+        
+        if len(booking_items) > 0:
+            if not isinstance(customer, Member):
+                raise ValueError("เฉพาะ Member เท่านั้นที่สามารถจองหนังสือ (Booking) ล่วงหน้าได้")
+
+            if not customer.check_booking_quota(len(booking_items)):
+                raise ValueError("โควต้าจองหนังสือล่วงหน้าเต็มแล้ว!")
         for item in selectitem_list:
             if isinstance(item,BookInfo):
                 customer.select(item,num_days)
