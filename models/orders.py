@@ -104,15 +104,15 @@ class Order:
                 upgradearea.confirm()
 
 class Purchase:
-    def __init__(self,order : list[Book, TimeSlot]):
-        self._order : list[Book, TimeSlot] = order
+    def __init__(self,order : list[Book | TimeSlot]):
+        self._order : list[Book | TimeSlot] = order
 
     @property
-    def get_order(self) -> list[Book, TimeSlot]:
+    def get_order(self) -> list[Book | TimeSlot]:
         return self._order
 
     def calculate_subtotal(self):
-        return sum((item.book_info.price) for item in self._order if isinstance(item,Book))   
+        return sum((item.book_info.price if isinstance(item, Book) else item.price) for item in self._order)   
     
     def confirm(self):
         for item in self._order:
