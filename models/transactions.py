@@ -210,6 +210,13 @@ class Transaction:
         area_list = {}
         upgrade_list = [item for item in selected_list if isinstance(item, UpgradeArea)]
 
+        booking_list = [order.book_info.search_book_incoming() for order in selected_list if isinstance(order, BookOrder) and order.book_info.activity_type == ActivityType.Booking]
+        
+        if len(booking_list) > 0:
+            if hasattr(self.__customer, 'book_booked'):
+                self.__customer.book_booked += len(booking_list)
+            self.__payment.order.booking_book = booking_list
+
         current_time = datetime.now().time()
         
         for areatype in AreaType:
@@ -239,7 +246,7 @@ class Transaction:
             for upg in upgrade_list:
                 self.add_upgrade_order(upg)
         
-        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0):
+        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0 or len(booking_list) > 0):
             raise ValueError("activity type not found")
         
     

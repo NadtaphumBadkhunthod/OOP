@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, date
 
 from fastmcp import FastMCP
 
@@ -12,7 +12,13 @@ mcp = FastMCP("Demo")
 
 @mcp.tool
 def create_customer(name:str ,surname:str ,phonenumber:str,email:str):
-    """สร้าง object ของลูกค้าขึ้นมา"""
+    """
+        สร้างบัญชีสำหรับลูกค้าใหม่
+        name : ชื่อจริงลูกค้า
+        surname : นามสกุลลูกค้า
+        phonenumber : เบอร์โทรศัพท์ 10 ตัว
+        email : อีเมลลูกค้า
+    """
     return {
         "Result Customer" :  bibliohub.add_customer(name,surname,phonenumber,email)
     }
@@ -69,7 +75,9 @@ def read_all_areas():
 
 @mcp.tool
 def search_area(phonenumber: str, area_id : str):
-    """ค้นหาพื้นที่ในการเช่า ว่ามีช่วงเวลาไหนว่างบ้าง"""
+    """
+        ค้นหาพื้นที่เพื่อให้ดูว่ามี ช่วงเวลาไหนว่างบ้าง สำหรับแต่ละพื้นที่
+    """
     
     customer = bibliohub.get_user_from_phone_number(phonenumber)
     if not customer:
@@ -121,13 +129,16 @@ def get_all_book_series():
 
 @mcp.tool
 def search_book_by_series(series : str):
-    """หาหนังสือด้วย ซีรีย์ของหนังสือเล่มนั้น (เช่น Naruto มี 10 ภาค ในนี้ก็จะใส่มาเป็น Naruto)"""
-    result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.get_book_stock(series).get_book_list(ActivityType.All)
+    """
+        แสดงผลหนังสือจาก ซีรีย์
+    """
+    result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.search_book_by_series(series)
     
     if not result:
         return "Series Not Found"
     
-    book_for_rent, book_for_sales = result
+    
+    book_for_rent, book_for_sales, book_for_booking = result
 
     return {
         "Book for rent" : [{
@@ -135,16 +146,27 @@ def search_book_by_series(series : str):
             "book id : " : book.id,
             "book available : " : book.get_nums_available()
         } for book in book_for_rent],
-        "Book for sales" : [{
-            "name : " : book.name,
-            "book id : " : book.id,
-            "book available : " : book.get_nums_available()
-        } for book in book_for_sales]
+        "Book for sales": [{
+            "name : ": book.name,
+            "book id : ": book.id,
+            "book available : ": book.get_nums_available()
+        } for book in book_for_sales],
+        "Book for booking": [{
+            "name : ": book.name,
+            "book id : ": book.id,
+            # สำหรับ Booking เราจะใช้ get_nums_incoming เพื่อดูจำนวนหนังสือที่กำลังจะเข้า
+            "book available : ": book.get_nums_incoming() if hasattr(book, 'get_nums_incoming') else 0
+        } for book in book_for_booking]
     }
 
 @mcp.tool
-def select(phonenumber:str,item_id:list[str],num_days:int = 0):
-    """เลือกหนังสือหรือพื้นที่ไปเก็บไว้ใน object ของลูกค้า เพื่อนำไปจ่ายเงินต่อไป ลูกค้าปกติจะเช่าหนังสือได้ 4 เท่านั้น และต้องรอคืนถึงจะเช่าต่อได้"""
+def select(phonenumber:str,item_id:list[str],num_days:int):
+    """
+        เลือกสินค้า ไม่ว่าจะหนังสือ หรือพื้นที่
+        หากต้องการสินค้า 3 ชิ้น 
+        ก็จะเป็น
+        [A-B-C,A-B-C,A-B-C] รหัสที่ต้องการตามจำนวนชิ้น
+    """
     return bibliohub.select(phonenumber,item_id,num_days)
 
 @mcp.tool
@@ -153,8 +175,10 @@ def get_all_staff():
     return [staff.info() for staff in bibliohub.get_staff_list]
 
 @mcp.tool
-def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocode:str = "xxxxxx"):
-    """จ่ายเงิน"""
+def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocode:str):
+    """
+        จ่ายเงิน หลังจากทำรายการอื่นๆ มาแล้ว
+    """
     transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method,promocode)
 
     return {
@@ -212,7 +236,9 @@ def get_transaction(phonenumber:str):
 
 @mcp.tool
 def return_book(book_id:list[str]):
-    """การคืนหนังสือที่เช่ามา"""
+    """
+        สำหรับให้ลูกค้าคืนหนังสือ
+    """
     return bibliohub.return_book(book_id)
 
 @mcp.tool
@@ -253,5 +279,4 @@ def check_upcoming_deadlines(
         }
 
 if __name__ == "__main__":
-    # uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
     mcp.run()
