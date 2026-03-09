@@ -91,6 +91,8 @@ def upgrade_booking_area(
     return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, slot_ids)
 
 def format_book_info(book : BookInfo):
+    is_booking = book.activity_type.value == "Booking"
+    available_nums = book.get_nums_incoming() if is_booking and hasattr(book, 'get_nums_incoming') else book.get_nums_available()
     return {
         "Book Name": book.name,
         "Book ID": book.id,
@@ -106,7 +108,8 @@ def get_all_book_series():
         respond.append({
             "Book Series" : bookstock.name,
             "Book For Sales" : [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Purchase)],
-            "Book For Rent": [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Rent)]
+            "Book For Rent": [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Rent)],
+            "Book For Booking": [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Booking)] if hasattr(ActivityType, 'Booking') else []
         })
     
     return {
@@ -120,19 +123,28 @@ def search_book_by_series(series : str):
     if not result:
         return "Series Not Found"
     
-    book_for_rent, book_for_sales = result
+    
+    book_for_rent, book_for_sales, book_for_booking = result
 
     return {
-        "Book for rent" : [{
-            "name : " : book.name,
-            "book id : " : book.id,
-            "book available : " : book.get_nums_available()
+        "Book for rent": [{
+            "name : ": book.name,
+            "book id : ": book.id,
+            "book available : ": book.get_nums_available()
         } for book in book_for_rent],
-        "Book for sales" : [{
-            "name : " : book.name,
-            "book id : " : book.id,
-            "book available : " : book.get_nums_available()
-        } for book in book_for_sales]
+        
+        "Book for sales": [{
+            "name : ": book.name,
+            "book id : ": book.id,
+            "book available : ": book.get_nums_available()
+        } for book in book_for_sales],
+        
+        "Book for booking": [{
+            "name : ": book.name,
+            "book id : ": book.id,
+            # สำหรับ Booking เราจะใช้ get_nums_incoming เพื่อดูจำนวนหนังสือที่กำลังจะเข้า
+            "book available : ": book.get_nums_incoming() if hasattr(book, 'get_nums_incoming') else 0
+        } for book in book_for_booking]
     }
 
 @app.get("/select",tags=["Select"])

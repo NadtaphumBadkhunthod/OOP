@@ -1,3 +1,4 @@
+from __future__ import annotations
 from models.transactions import Transaction, Notification
 from models.books import Book, BookInfo, BookOrder
 from models.areas import TimeSlot
@@ -133,6 +134,7 @@ class Member(Customer):
         self.__points = 0
         self.__booking_book_quota = BookingBookQuota.Silver
         self.__status = CustomerStatus.Good
+        self.__book_booked = 0
 
     @property
     def level_member(self):
@@ -150,6 +152,20 @@ class Member(Customer):
         elif self.__points >= 100:
             self.__level_member = LevelMember.Platinum
 
+    @property
+    def book_booked(self):
+        return self.__book_booked
+    
+    @book_booked.setter
+    def book_booked(self, amount):
+        self.__book_booked = amount
+
+    def check_booking_quota(self, request_book_nums):
+        current_in_cart = len([item for item in self.get_selected_list 
+                             if hasattr(item, 'book_info') and item.book_info.activity_type == ActivityType.Booking])
+        
+
+        return (self.book_booked + current_in_cart + request_book_nums) <= self.__booking_book_quota.value
 class Staff(Member):
     count = 0
     def __init__(self, name, surname, phonenumber, email, birth_month):

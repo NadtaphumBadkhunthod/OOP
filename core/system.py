@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import HTTPException, status
 from datetime import datetime
 
@@ -210,6 +211,8 @@ class System:
                 activity_type = ActivityType.Rent
             elif activity_type == ActivityType.Purchase.value:
                 activity_type = ActivityType.Purchase
+            elif activity_type == ActivityType.Booking.value:
+                activity_type = ActivityType.Booking
             else:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -317,7 +320,13 @@ class System:
                 book_with_same_name[book_info] = 1
 
         for book in book_with_same_name:
-            if book_with_same_name.get(book) > book.get_nums_available():
+            if book.activity_type.value == "Booking":
+                if hasattr(book, 'get_nums_incoming') and book_with_same_name.get(book) > book.get_nums_incoming():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"หนังสือ {book.name} (ที่กำลังเข้ามา) มีจำนวนไม่พอให้จอง"
+                    )
+            elif book_with_same_name.get(book) > book.get_nums_available(): # เปลี่ยนของเดิมเพื่อนจาก if เป็น elif
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"หนังสือ {book.name} มีไม่พอโปรดทำรายการใหม่"
@@ -335,6 +344,26 @@ class System:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"เช่าหนังสือโควต้าเต็ม! คุณจองได้อีก {customer.rental_quota - customer.book_rented - len([rentbook for rentbook in customer.get_selected_list if isinstance(rentbook,BookOrder) and rentbook.book_info.activity_type == ActivityType.Rent])} เล่ม"
             )
+        
+        booking_items = [book for book in selectitem_list if isinstance(book, BookInfo) and book.activity_type == ActivityType.Booking]
+        
+        if len(booking_items) > 0:
+            # เช็คว่า customer เป็น instance ของ Member จริงๆ หรือไม่
+            # (อย่าลืม import Member มาไว้ในไฟล์นี้ด้วยนะ)
+            from models.customers import Member 
+            
+            if not isinstance(customer, Member):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, # ใช้ 403 (Forbidden) จะสื่อสารชัดกว่า
+                    detail="เฉพาะ Member เท่านั้นที่สามารถจองหนังสือ (Booking) ล่วงหน้าได้"
+                )
+            
+            # ถ้าเป็น Member แล้ว ค่อยไปเช็คโควต้าต่อ
+            if not customer.check_booking_quota(len(booking_items)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="โควต้าจองหนังสือล่วงหน้าเต็มแล้ว!"
+                )
         
         for item in selectitem_list:
             if isinstance(item,BookInfo):

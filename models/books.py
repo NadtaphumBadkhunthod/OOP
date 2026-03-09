@@ -62,6 +62,9 @@ class Book:
     def check_available(self):
         return self.__book_status == ItemStatus.Available.value
     
+    def check_incoming(self):
+        return self.__book_status == ItemStatus.Incoming.value or self.__book_status == ItemStatus.Incoming
+    
     def change_status(self,status:ItemStatus):
         self.__book_status = status
 
@@ -161,6 +164,24 @@ class BookInfo:
             detail=f"หนังสือ {self.name} มีจำนวนไม่พอ"
         )
     
+    def get_nums_incoming(self):
+        count = 0
+        for book in self.__book:
+            if book.book_status == ItemStatus.Incoming.value or book.book_status == ItemStatus.Incoming:
+                count += 1
+        return count
+
+    def search_book_incoming(self):
+        for book in self.__book:
+            if book.book_status == ItemStatus.Incoming.value or book.book_status == ItemStatus.Incoming:
+                book.change_status(ItemStatus.InProcess)
+                return book
+            
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"หนังสือ {self.name} ไม่มีสถานะ Incoming เหลือให้จองแล้ว"
+        )
+    
 class BookOrder:
     def __init__(self,book_info : BookInfo,nums_date):
         self.__book_info : BookInfo = book_info
@@ -184,6 +205,7 @@ class BookStock:
         self.__name = name
         self.__forsale_book_list : list[BookInfo] = []
         self.__rent_book_list : list[BookInfo] = []
+        self.__booking_book_list: list[BookInfo] = []
 
     @property
     def name(self):
@@ -194,8 +216,10 @@ class BookStock:
             return self.__rent_book_list
         elif activity_type.value == "Purchase":
             return self.__forsale_book_list
+        elif activity_type.value == "Booking":
+            return self.__booking_book_list
         elif activity_type.value == "All":
-            return self.__rent_book_list, self.__forsale_book_list
+            return self.__rent_book_list, self.__forsale_book_list, self.__booking_book_list
         else:
             raise TypeError("Wrong Activity Type")
 
@@ -219,6 +243,8 @@ class BookStock:
             self.__rent_book_list.append(book_info)
         elif activity_type.value == "Purchase":
             self.__forsale_book_list.append(book_info)
+        elif activity_type.value == "Booking":
+            self.__booking_book_list.append(book_info)
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

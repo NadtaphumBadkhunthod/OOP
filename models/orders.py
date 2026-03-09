@@ -1,11 +1,13 @@
+from __future__ import annotations
 from models.books import Book
 from models.areas import Area, TimeSlot
 from models.infos import ActivityType, AreaType, ItemStatus
-from datetime import datetime
+from datetime import datetime,timedelta
 class Order:
     def __init__(self):
         self.__rent_book : RentBook = None
         self.__purchase_book : Purchase = None
+        self.__booking_book :BookingBook = None
         self.__booking_area : list[BookingArea] = []
         self.__upgrade_area : list[UpgradeArea] = []  # เพิ่ม List สำหรับเก็บรายการอัปเกรด
     @property
@@ -43,6 +45,12 @@ class Order:
                 "New Slots" : [f"{slot}" for slot in upg.new_slots],
                 "Upgrade Fee" : upg.upgrade_delta
             } for upg in self.__upgrade_area])
+        if getattr(self, '_Order__booking_book', None): # หรือถ้าประกาศ self.__booking_book ไว้ใน __init__ แล้ว ใช้ if self.__booking_book: ได้เลย
+            order_info.extend([{
+                **format_book(book), # กระจายข้อมูลพื้นฐานของหนังสือออกมา
+                "Reservation Date": self.__booking_book.reservation_date,
+                "Pickup Deadline": self.__booking_book.pickup_deadline
+            } for book in self.__booking_book.get_order])
         return {"Order Info" : order_info}
 
     @property
@@ -74,7 +82,13 @@ class Order:
         for areatype in AreaType:
             if timeslot_list.get(areatype):
                 self.__booking_area.append(BookingArea(timeslot_list[areatype]))
+    @property
+    def booking_book(self):
+        return self.__booking_book
     
+    @booking_book.setter
+    def booking_book(self, book_list : list[Book]):
+        self.__booking_book = BookingBook(book_list)
     # เพิ่ม setter สำหรับเอา UpgradeArea เข้าตะกร้า
     def add_upgrade_area(self, upgrade_item: 'UpgradeArea'):
         self.__upgrade_area.append(upgrade_item)
@@ -89,6 +103,8 @@ class Order:
             total += sum(area.calculate_subtotal() for area in self.__booking_area)
         if self.__upgrade_area: # บวกค่าส่วนต่างอัปเกรดเข้าไปด้วย
             total += sum(upg.calculate_subtotal() for upg in self.__upgrade_area)
+        if getattr(self, '_Order__booking_book', None):
+            total += self.__booking_book.calculate_subtotal()
         return total
     
     def confirm(self):
@@ -102,6 +118,8 @@ class Order:
         if len(self.__upgrade_area) > 0:
             for upgradearea in self.__upgrade_area:
                 upgradearea.confirm()
+        if getattr(self, '_Order__booking_book', None):
+            self.__booking_book.confirm()
 
 class Purchase:
     def __init__(self,order : list[Book | TimeSlot]):
@@ -220,3 +238,32 @@ class UpgradeArea(Purchase):
         #ยึดของใหม่
         for slot in self.__new_slots:
             slot.change_status(ItemStatus.NotAvailable)
+
+class BookingBook(Purchase):
+    def __init__(self, order: list[Book]):
+        super().__init__(order)
+        self.__reservation_date = datetime.now()
+        
+        # วันมารับ = วันที่หนังสือเข้า (available_date) + 3 วัน
+        available_date = order[0].book_info.available_date if order else datetime.now().date()
+        if isinstance(available_date, datetime):
+            available_date = available_date.date()
+        self.__pickup_deadline = available_date + timedelta(days=3)
+        
+    @property
+    def reservation_date(self):
+        return self.__reservation_date
+        
+    @property
+    def pickup_deadline(self):
+        return self.__pickup_deadline
+        
+    def check_pickup_deadline(self):
+        return datetime.now().date() <= self.__pickup_deadline
+        
+    def calculate_total_books(self):
+        return len(self._order)
+        
+    def confirm(self):
+        for item in self._order:
+            item.change_status(ItemStatus.Confirm)
