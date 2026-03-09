@@ -1,5 +1,4 @@
 from __future__ import annotations
-from fastapi import HTTPException, status
 from datetime import datetime
 
 from models.infos import ItemType, BirthMonth, PaymentOptions, ActivityType, ItemStatus, TransactionStatus, PromotionType
@@ -38,16 +37,10 @@ class System:
         """
 
         if (not (self.validate_name_and_surname(name,surname) and self.validate_email(email) and self.validate_phonenumber(phonenumber))):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Validation Fail"
-            )
+            raise ValueError("Validation Fail")
         
         if (self.check_duplicate_account(phonenumber)):
-            return HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Account Duplicate"
-            )
+            return ValueError("Account Duplicate")
         
         member = Member(name,surname,phonenumber,email,birth_month)
         self.__customer_list.append(member)
@@ -129,10 +122,7 @@ class System:
             raise ValueError("Phone number contains invalid characters.")
 
         if len(clean_digits) != 10:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Phone number length is invalid (should be 10 digits). {len(clean_digits)}"
-            )
+            raise ValueError(f"Phone number length is invalid (should be 10 digits). {len(clean_digits)}")
         
         return True
 
@@ -179,10 +169,7 @@ class System:
             if bookstock.name == series:
                 return bookstock.get_book_info_by_name(book_name,author,activity_type)
         
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Book Series Not Found"
-        )
+        raise ValueError("Book Series Not Found")
     
     def get_book(self,book_series,bookname,author,activity_type,book_id) -> Book | None:
             for bookstock in self.__book_stock:
@@ -214,10 +201,7 @@ class System:
             elif activity_type == ActivityType.Booking.value:
                 activity_type = ActivityType.Booking
             else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Activity Type Not Found"
-                )
+                raise ValueError("Activity Type Not Found")
             return activity_type,series,book_name,author
         elif type_of_item == ItemType.Area:
             parts = item_id.split("-")
@@ -245,10 +229,7 @@ class System:
         selectitem_list = []
 
         if not customer:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="'User' Not Found"
-            )
+            raise ValueError("'User' Not Found")
         for id in item_id:
             type_of_item = self.check_type_from_id(id)
 
@@ -258,10 +239,7 @@ class System:
                 book_info = self.get_book_info(series,book_name,author,activity_type)
 
                 if not book_info:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Book Not Found, Maybe checking your book id"
-                    )
+                    raise ValueError("Book Not Found, Maybe checking your book id")
                 
                 selectitem_list.append(book_info)
             elif type_of_item == ItemType.Area:
@@ -274,10 +252,7 @@ class System:
                         break
 
                 if not target_area:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="ไม่พบพื้นที่"
-                    )
+                    raise ValueError("ไม่พบพื้นที่")
                 
                 target_time_slot = None
                 for timeslot in area.list_timeslot:
@@ -286,28 +261,18 @@ class System:
                         break
                         
                 if not target_time_slot or target_time_slot.is_available != ItemStatus.Available:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)"
-                    )
+                    raise ValueError(f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)")
                 
                 current_time = datetime.now().time()
                 #current_time = datetime.strptime("13:00", "%H:%M").time()
                 slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
                 
                 if slot_start_time <= current_time:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})"
-                    )
-                
+                    raise ValueError(f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})")
                 if target_time_slot not in selectitem_list and target_time_slot not in customer.get_selected_list:
                     selectitem_list.append(timeslot)
                 else:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"{target_time_slot} - Already Selected"
-                    )
+                    raise ValueError(f"{target_time_slot} - Already Selected")
 
         all_book : list[BookInfo] = [book for book in selectitem_list if isinstance(book,BookInfo)] + [book.book_info for book in customer.get_selected_list if isinstance(book,BookOrder)]
         
@@ -322,28 +287,16 @@ class System:
         for book in book_with_same_name:
             if book.activity_type.value == "Booking":
                 if hasattr(book, 'get_nums_incoming') and book_with_same_name.get(book) > book.get_nums_incoming():
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"หนังสือ {book.name} (ที่กำลังเข้ามา) มีจำนวนไม่พอให้จอง"
-                    )
+                    raise ValueError(f"หนังสือ {book.name} (ที่กำลังเข้ามา) มีจำนวนไม่พอให้จอง")
             elif book_with_same_name.get(book) > book.get_nums_available(): # เปลี่ยนของเดิมเพื่อนจาก if เป็น elif
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"หนังสือ {book.name} มีไม่พอโปรดทำรายการใหม่"
-                )
+                raise ValueError(f"หนังสือ {book.name} มีไม่พอโปรดทำรายการใหม่")
             
 
         if not customer.check_area_quota(len([request_slot for request_slot in selectitem_list if isinstance(request_slot,TimeSlot)])):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"สล็อตโควต้าเต็ม! คุณจองได้อีก {customer.get_area_quota() - customer.booking_reservation_time} ชม."
-            )
+            raise ValueError(f"สล็อตโควต้าเต็ม! คุณจองได้อีก {customer.get_area_quota() - customer.booking_reservation_time} ชม.")
         
         if not customer.check_rent_quota(len([rentbook for rentbook in selectitem_list if isinstance(rentbook,BookInfo) and rentbook.activity_type == ActivityType.Rent])):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"เช่าหนังสือโควต้าเต็ม! คุณจองได้อีก {customer.rental_quota - customer.book_rented - len([rentbook for rentbook in customer.get_selected_list if isinstance(rentbook,BookOrder) and rentbook.book_info.activity_type == ActivityType.Rent])} เล่ม"
-            )
+            raise ValueError(f"เช่าหนังสือโควต้าเต็ม! คุณจองได้อีก {customer.rental_quota - customer.book_rented - len([rentbook for rentbook in customer.get_selected_list if isinstance(rentbook,BookOrder) and rentbook.book_info.activity_type == ActivityType.Rent])} เล่ม")
         
         booking_items = [book for book in selectitem_list if isinstance(book, BookInfo) and book.activity_type == ActivityType.Booking]
         
@@ -353,17 +306,11 @@ class System:
             from models.customers import Member 
             
             if not isinstance(customer, Member):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, # ใช้ 403 (Forbidden) จะสื่อสารชัดกว่า
-                    detail="เฉพาะ Member เท่านั้นที่สามารถจองหนังสือ (Booking) ล่วงหน้าได้"
+                raise ValueError("เฉพาะ Member เท่านั้นที่สามารถจองหนังสือ (Booking) ล่วงหน้าได้"
                 )
-            
             # ถ้าเป็น Member แล้ว ค่อยไปเช็คโควต้าต่อ
             if not customer.check_booking_quota(len(booking_items)):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="โควต้าจองหนังสือล่วงหน้าเต็มแล้ว!"
-                )
+                raise ValueError("โควต้าจองหนังสือล่วงหน้าเต็มแล้ว!")
         
         for item in selectitem_list:
             if isinstance(item,BookInfo):
@@ -395,10 +342,7 @@ class System:
             return "Not a customer"
         
         if len(customer.get_selected_list) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No Order"
-            )
+            raise ValueError("No Order")
 
         transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
         transaction.order = customer.get_selected_list
@@ -443,16 +387,10 @@ class System:
                     raise ValueError(f"ไม่อนุญาตให้ใส่ '_' หรือ '-' ในข้อมูล: '{input}'")
         
         if price <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="ราคาต้องมากกว่า 0"
-            )
+            raise ValueError("ราคาต้องมากกว่า 0")
         
         if number_of_copies <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="จำนวนเล่มต้องมากกว่า 0"
-            )
+            raise ValueError("จำนวนเล่มต้องมากกว่า 0")
         
         book_stock = None
         
@@ -501,10 +439,7 @@ class System:
         for staff in self.__staff_list:
             if staff.no_staff == no_staff:
                 return staff
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Staff Not Found"
-        )
+        raise ValueError("Staff Not Found")
 
     def remove_staff(self,staff):
         if isinstance(staff,Staff):
@@ -552,36 +487,23 @@ class System:
         customer = self.get_user_from_phone_number(phonenumber)
 
         if not customer:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Customer Not Found"
-            )
+            raise ValueError("Customer Not Found")
 
         result = []
         for id in book_id:
             type_item = self.check_type_from_id(id)
             if not type_item == ItemType.Book:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Need to return a book only"
-                )
+                raise ValueError("Need to return a book only")
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
             book = self.get_book(series,book_name,author,activity_type,id)
 
             if not book:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Book Not Found | id : {id}"
-                )
+                raise ValueError(f"Book Not Found | id : {id}")
             
             if book.book_status != ItemStatus.InUse and book.book_status != ItemStatus.Confirm:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"This book is not in use"
-                )
-            
+                raise ValueError(f"This book is not in use")
             book.change_status(ItemStatus.NotAvailable)
 
             result.append(id)
@@ -598,36 +520,24 @@ class System:
 
     def process_return_book(self,no_staff,book_id : list[str]):
         if not isinstance(self.get_staff_by_no_staff(no_staff),Staff):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Need to be staff for process returned book"
-            )
+            raise ValueError("Need to be staff for process returned book")
         
         result = []
 
         for id in book_id:
             type_item = self.check_type_from_id(id)
             if not type_item == ItemType.Book:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Need to return a book only"
-                )
+                raise ValueError("Need to return a book only")
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
             book = self.get_book(series,book_name,author,activity_type,id)
 
             if not book:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Book Not Found | id : {id}"
-                )
+                raise ValueError(f"Book Not Found | id : {id}")
             
             if book not in self.book_returned_list:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Book not return yet"
-                )
+                raise ValueError("Book not return yet")
             
             result.append(id)
             
@@ -645,10 +555,7 @@ class System:
         #หา Customer
         customer = self.get_user_from_phone_number(phonenumber)
         if not customer:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Customer Not Found"
-            )
+            raise ValueError("Customer Not Found")
             
         # หา Transaction ล่าสุดที่ใช้งานอยู่ (Active) เพื่อดึงของเก่า
         active_trans = None
@@ -659,35 +566,29 @@ class System:
                 break
                 
         if not active_trans:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ไม่พบรายการจองที่กำลังใช้งานอยู่ (No active transaction)"
-            )
+            raise ValueError("ไม่พบรายการจองที่กำลังใช้งานอยู่ (No active transaction)")
             
         old_booking_obj = active_trans.get_current_booking_area(old_area_id)
         
         #ดึง Area ใหม่ และสล็อตเวลาใหม่
         target_area = next((a for a in self.__area if a.area_id == new_area_id), None)
         if not target_area:
-            raise HTTPException(status_code=404, detail="ไม่พบพื้นที่ใหม่ที่ต้องการอัปเกรด")
+            raise ValueError("ไม่พบพื้นที่ใหม่ที่ต้องการอัปเกรด")
             
         new_slots = target_area.get_slots_by_ids(slot_ids)
         if len(new_slots) != len(slot_ids):
-            raise HTTPException(status_code=400, detail="สล็อตเวลาบางอันไม่ถูกต้อง")
+            raise ValueError("สล็อตเวลาบางอันไม่ถูกต้อง")
 
         current_time = datetime.now().time()
         #current_time = datetime.strptime("13:00", "%H:%M").time()
         for slot in new_slots:
             if slot.is_available != ItemStatus.Available:
-                raise HTTPException(status_code=400, detail=f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")
+                raise ValueError(f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")
             
             # แปลงสตริง
             slot_start_time = datetime.strptime(slot.start_time, "%H:%M").time()
             if slot_start_time <= current_time:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, 
-                    detail=f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({slot.start_time}-{slot.end_time})"
-                )
+                raise ValueError(f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({slot.start_time}-{slot.end_time})")
 
         #เช็คโควต้าเฉพาะเวลาที่บวกเพิ่ม
         old_hours = len(old_booking_obj.get_order)
@@ -696,16 +597,13 @@ class System:
         if new_hours > old_hours:
             extra_hours = new_hours - old_hours
             if not customer.check_area_quota(extra_hours):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"โควต้าเวลาเต็ม! คุณบวกเวลาเพิ่มได้อีกแค่ {customer.get_area_quota() - customer.booking_reservation_time} ชม."
-                )
+                raise f"โควต้าเวลาเต็ม! คุณบวกเวลาเพิ่มได้อีกแค่ {customer.get_area_quota() - customer.booking_reservation_time} ชม."
 
         #สร้างใบอัปเกรด
         try:
             upgrade_item = UpgradeArea(old_booking_obj, new_slots)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise ValueError(str(e))
             
         customer.select(upgrade_item)
         
