@@ -112,7 +112,7 @@ class Purchase:
         return self._order
 
     def calculate_subtotal(self):
-        return sum((item.book_info.price if isinstance(item, Book) else item.price) for item in self._order)   
+        return sum((item.book_info.price * (item.end_date - item.start_date).days if isinstance(item, Book) else item.price) for item in self._order)   
     
     def confirm(self):
         for item in self._order:
