@@ -99,7 +99,8 @@ def format_book_info(book : BookInfo):
     return {
         "Book Name": book.name,
         "Book ID": book.id,
-        "Book Copies": book.copies
+        "Book Copies": book.copies,
+        "book available : " : book.get_nums_available()
     }
 
 @mcp.tool
@@ -107,7 +108,7 @@ def get_all_book_series():
     """แสดงหนังสือทั้งหมด"""
     respond = []
 
-    for bookstock in Bibliohub.get_all_book():
+    for bookstock in bibliohub.get_all_book():
         respond.append({
             "Book Series" : bookstock.name,
             "Book For Sales" : [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Purchase)],
@@ -123,22 +124,22 @@ def search_book_by_series(series : str):
     """หาหนังสือด้วย ซีรีย์ของหนังสือเล่มนั้น (เช่น Naruto มี 10 ภาค ในนี้ก็จะใส่มาเป็น Naruto)"""
     result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.get_book_stock(series).get_book_list(ActivityType.All)
     
-    if not customer.check_eligibility():
-        raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE,
-            detail="Don't come in to my place, Go away and don't comeback"
-        )
+    if not result:
+        return "Series Not Found"
     
-    respond = []
+    book_for_rent, book_for_sales = result
 
-    bookstock = Bibliohub.search_book(book_series)
-    respond.append({
-        "Book Series" : bookstock.name,
-        "Book For Sales" : [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Purchase)],
-        "Book For Rent": [format_book_info(book_info) for book_info in bookstock.get_book_list(ActivityType.Rent)]
-    })
     return {
-        "Book Result" : respond
+        "Book for rent" : [{
+            "name : " : book.name,
+            "book id : " : book.id,
+            "book available : " : book.get_nums_available()
+        } for book in book_for_rent],
+        "Book for sales" : [{
+            "name : " : book.name,
+            "book id : " : book.id,
+            "book available : " : book.get_nums_available()
+        } for book in book_for_sales]
     }
 
 @mcp.tool
@@ -156,25 +157,28 @@ def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocod
     """จ่ายเงิน"""
     transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method,promocode)
 
-
-    respond = []
-
-    for selected in customer.get_selected_list:
-        if isinstance(selected,Book):
-            respond.append({
-                "Book Name" : selected.book_info.name,
-                "Book Series" : selected.book_info.book_stock.name,
-                "Book Author" : selected.book_info.author,
-                "Book Category" : selected.book_info.category.value,
-                "Book Price" : selected.book_info.price,
-                "Book Activity Type" : selected.book_info.activity_type.value,
-                "Book Available Date" : selected.book_info.available_date,
-                "Book Status" : selected.book_status,
-                "Book UID" : selected.uid
-            })
-    print("Select Successful")
     return {
-        "Customer Selected List" : respond
+        "Transaction" : {
+            "customer name" : transaction.customer.name,
+            "staff name" : transaction.staff.name,
+            "start date" : transaction.start_date_time,
+            "end date" : transaction.end_date_time,
+            "status" : transaction.status,
+            "payment no" : transaction.payment.payment_no,
+            "audit log" : transaction.audit_logs
+        },
+        "Payment" : {
+            "payment no" : transaction.payment.payment_no,
+            "status" : transaction.payment.status,
+            "order" : transaction.payment.order.info,
+            "timestamp" : transaction.payment.timestamp, 
+            "payment method" : transaction.payment.payment_method.name, 
+            "base fee" : transaction.payment.base_fee, 
+            "upgrade delta" : transaction.payment.upgrade_delta,
+            "discount amount" : transaction.payment.discount_amount,
+            "penalty fee" : transaction.payment.penalty_fee,
+            "net amount" : transaction.payment.net_amount
+        }
     }
 
 @mcp.tool
@@ -182,7 +186,7 @@ def get_transaction(phonenumber:str):
     """แสดงผล การทำรายการทั้งหมดของลูกค้าคนใดคนหนึ่ง"""
     customer = bibliohub.get_user_from_phone_number(phonenumber)
 
-    return {
+    return [{
         "Transaction" : {
             "customer name" : transaction.customer.name,
             "staff name" : transaction.staff.name,
