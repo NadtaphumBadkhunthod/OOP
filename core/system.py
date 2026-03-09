@@ -39,6 +39,7 @@ class System:
             raise PermissionError("Customer already a member")
         
         member = Member(customer,birth_month)
+        self.delete_customer(customer)
         self.__customer_list.append(member)
 
         return member
