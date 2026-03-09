@@ -1,0 +1,114 @@
+sequenceDiagram
+    autonumber
+    actor Customer as Customer
+    participant CS as Customer
+    participant SYS as BiblioHubSystem
+    Customer ->> SYS: checkout(phonenumber,staff,payment_method)
+    activate SYS
+    create participant Order as Order
+    SYS ->> Order: create()
+    activate Order
+    Order -->> SYS: return order object [object]
+    deactivate Order
+
+    SYS ->> CS: get_selected_list()
+    CS -->> SYS: return selected_list [list]
+
+    alt is RentBook
+        create participant RB as RentBook
+        SYS ->> RB: create(book_rent_list)
+        activate RB
+        RB -->> SYS: return RentBook object [object]
+        deactivate RB
+        SYS ->> Order: set_rent_book(RentBook[object])
+        activate Order
+        Order -->> SYS: return set_rent_book successful
+        deactivate Order
+    else is PurchaseBook
+        create participant PB as PurchaseBook
+        SYS ->> PB: create(book_purchase_list)
+        activate PB
+        PB -->> SYS: return PurchaseBook object [object]
+        deactivate PB
+        SYS ->> Order: set_purchase_book(PurchaseBook[object])
+        activate Order
+        Order -->> SYS: return set_purchase_book successful
+        deactivate Order
+    end
+
+    create participant PMM as PaymentMethod
+    SYS ->> PMM: create(payment_method)
+    activate PMM
+    PMM -->> SYS: return PaymentMethod object [object]
+    deactivate PMM
+
+    create participant PM as Payment
+    SYS ->> PM: process_payment(CS,order,payment_method)
+    activate PM
+    PM -->> SYS: return payment status [bool]
+    deactivate PM
+    create participant TS as Transaction
+    SYS ->> TS: create(CS,staff,payment,datetime.now(),datetime.now())
+    activate TS
+    TS -->> SYS: return Transaction object [object]
+
+    SYS ->> TS: add_audit_log("Transaction requested")
+    TS -->> SYS: return add_audit_log successful
+    deactivate TS
+
+    SYS ->> PM: calculate_net_amount()
+    activate PM
+    PM -->> SYS: return net amount [float]
+    deactivate PM
+
+    SYS ->> PMM: process_payment()
+    activate PMM
+    PMM -->> SYS: return payment status [bool]
+    deactivate PMM
+
+    alt Payment successful
+        SYS ->> PM: update_payment_status("Paid")
+        activate PM
+        PM -->> SYS: return update_payment_status successful
+        deactivate PM
+        SYS ->> TS: update_transaction_status("Confirmed")
+        activate TS
+        TS -->> SYS: return successful
+        SYS ->> TS: add_audit_log("transaction completed")
+        TS -->> SYS: return add_audit_log successful
+        deactivate TS
+
+        SYS ->> Order: confirm()
+        activate Order
+        Order -->> SYS: return confirm successful
+        deactivate Order
+
+        SYS ->> SYS: notify_user(CS,message)
+        create participant Notify as Notification
+        SYS ->> Notify: create(message,target_user)
+        activate Notify
+        Notify -->> SYS: return Notification [object]
+        SYS ->> Notify: send_message()
+        Notify -->> SYS: return Notification status [object]
+        deactivate Notify
+
+        SYS ->> CS: add_transaction(Transaction[object])
+        activate CS
+        CS -->> SYS: return add_transaction status[bool]
+
+        SYS ->> CS: add notify()
+        CS -->> SYS: return notify successful
+
+        opt is Member
+            SYS ->> CS: add_point()
+            activate CS
+            MB -->> SYS: return add_point successful
+            deactivate CS
+        end
+        SYS -->> CS: return checkout successful
+
+    else
+        SYS -->> CS: return checkout unsuccessful
+        deactivate CS
+        deactivate SYS
+    end
