@@ -8,7 +8,9 @@ WayLaOpen = [
     ["12:01", "13:00"],
     ["13:01", "14:00"],
     ["14:01", "15:00"],
-    ["15:01", "16:00"]
+    ["15:01", "16:00"],
+    ["16:01", "17:00"],
+    ["17:01", "18:00"]
 ]
 
 class Area:
@@ -98,11 +100,3 @@ class TimeSlot:
     @property
     def area(self):
         return self.__area
-    
-    @property
-    def list_time_slots(self):
-        return self.__list_time_slots
-    
-    def add_time_slots(self,timeslot : TimeSlot):
-        if isinstance(timeslot,TimeSlot):
-            self.__list_time_slots.append(timeslot)
