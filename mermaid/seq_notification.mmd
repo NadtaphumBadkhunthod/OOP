@@ -1,72 +1,103 @@
 sequenceDiagram
     autonumber
-    actor S as System 
+    actor SCH as Scheduler
     participant SYS as BiblioHubSystem
     participant TS as Transaction
-    participant CS as Customer
-    participant NTF as Notification
+    participant BA as BookingArea
+    participant TM as TimeSlot
+    participant RB as RentBook
+    participant B as Book
+    participant BB as BookingBook
+    participant PS as Purchase
 
-    S->>SYS: notify_user(customer, message)
+    SCH->>SYS: check_upcoming_deadlines(current_datetime)
+    activate SYS
 
-    loop each Transaction in self.__transaction_list
+    SYS->>SYS: process_notifications(current_datetime)
+    activate SYS
+
+    loop each Transaction in __transaction_list
         SYS->>TS: get_customer()
+        activate TS
         TS-->>SYS: customer_obj
-        
-        %% Booking Area
-        opt has Booking Area
-            SYS->>TS: get_booking_area_slots()
-            TS-->>SYS: timeslot_list
-            loop each timeslot
-                SYS->>SYS: calculate_time_noti(slot.start_time, slot.end_time)
-                SYS->>NTF: send_message(customer, message)
-                NTF-->>SYS: return "Notification sended allready"
-                SYS->>CS: add_notify(Notification)
-                CS-->>SYS: return "Now the Notification sent to customer success"
-                SYS->>SYS: add_notification(Notification)
+        deactivate TS
+
+        Note over SYS: pending_notifies = [] (List of String Messages)
+
+        opt Object is BookingArea (TimeSlot)
+            SYS->>BA: get_area_order()
+            activate BA
+            BA-->>SYS: List<TimeSlot>
+            deactivate BA
+            loop each Slot
+                SYS->>TM: get_slot_times()
+                activate TM
+                TM-->>SYS: return start_time, end_time
+                deactivate TM
+                SYS->>SYS: should_notify(current_datetime, slot_item)
+                activate SYS
+                Note right of SYS: if match, append "Area_Message" to pending_notifies
+                deactivate SYS
             end
         end
 
-        %% Rent Book
-        opt has Rent Books
-            SYS->>TS: get_rented_books()
-            TS-->>SYS: rent_book_list
-            loop each book
-                SYS->>SYS: calculate_time_noti(book.start_date, book.end_date)
-                SYS->>NTF: send_message(customer, message)
-                NTF-->>SYS: return "Notification sended allready"
-                SYS->>CS: add_notify(Notification)
-                CS-->>SYS: return "Now the Notification sent to customer success"
-                SYS->>SYS: add_notification(Notification)
+        opt Object is RentBook
+            SYS->>RB: get_rent_order()
+            activate RB
+            RB-->>SYS: List<Book>
+            deactivate RB
+            loop each Book
+                SYS->>B: get_rental_dates()
+                activate B
+                B-->>SYS: return start_date, end_date
+                deactivate B
+                SYS->>SYS: should_notify(current_datetime, rent_item)
+                activate SYS
+                Note right of SYS: if match, append "Rent_Message" to pending_notifies
+                deactivate SYS
             end
         end
 
-        %% Purchase Book
-        opt has Purchase Book
-            SYS->>TS: get_purchase_books()
-            TS-->>SYS: putchase_book_list
-            loop each book
-                SYS->>SYS: calculate_time_noti(start_date, end_date = start_date)
-                SYS->>NTF: send_message(customer, message)
-                NTF-->>SYS: return "Notification sended allready"
-                SYS->>CS: add_notify(Notification)
-                CS-->>SYS: return "Now the Notification sent to customer success"
-                SYS->>SYS: add_notification(Notification)
+        opt Object is BookingBook
+            SYS->>BB: get_booking_book_order()
+            activate BB
+            BB-->>SYS: List<Book>
+            deactivate BB
+            loop each Book
+                SYS->>B: get_booking_dates()
+                activate B
+                B-->>SYS: return start_date, end_date
+                deactivate B
+                SYS->>SYS: should_notify(current_datetime, booking_item)
+                activate SYS
+                Note right of SYS: if match, append "Booking_Message" to pending_notifies
+                deactivate SYS
             end
         end
 
-        %% BookingBook
-        opt has BookingBook Book
-            SYS->>TS: get_booking_books()
-            TS-->>SYS: booking_book_list
-            loop each book
-                SYS->>SYS: calculate_time_noti(book.start_date, book.end_date)
-                SYS->>NTF: send_message(customer, message)
-                NTF-->>SYS: return "Notification sended allready"
-                SYS->>CS: add_notify(Notification)
-                CS-->>SYS: return "Now the Notification sent to customer success"
-                SYS->>SYS: add_notification(Notification)
+        opt Object is Purchase
+            SYS->>PS: get_purchase_order()
+            activate PS
+            PS-->>SYS: List<Book>
+            deactivate PS
+            loop each Book
+                SYS->>SYS: should_notify(current_datetime, purchase_item)
+                activate SYS
+                Note right of SYS: if match, append "Purchase_Message" to pending_notifies
+                deactivate SYS
             end
         end
+
+        loop each message in pending_notifies
+            SYS->>SYS: notify_user(customer_obj, message)
+            activate SYS
+            Note right of SYS: Save Notification to List
+            deactivate SYS
+        end
+
     end
-    
-    SYS-->>S: status("All notifications processed")
+
+    deactivate SYS
+
+    SYS-->>SCH: status("Notification checked")
+    deactivate SYS

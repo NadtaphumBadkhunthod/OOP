@@ -810,7 +810,7 @@ class System:
                     return bookstock
             return "Not Found"
             
-    def get_book(self,book_series,bookname,activity_type) -> Book | None:
+    def get_book(self,book_series,bookname,activity_type) -> Book | None: #อันนี้น่าจะเป็น bookinfo มั้ย
             for bookstock in self.__book_stock:
                 if bookstock.name == book_series:
                     return bookstock.search_book_available(bookname,activity_type) 
