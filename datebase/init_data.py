@@ -52,6 +52,5 @@ def mock_data():
     # Add Copies
     bibliohub.add_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,datetime.today().date())
     bibliohub.add_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Purchase,10,datetime.today().date())
-    AreaOption = Enum('AreaOption', area_names, type=str)
 
-    return bibliohub, AreaOption
+    return bibliohub
