@@ -100,3 +100,11 @@ class TimeSlot:
     @property
     def area(self):
         return self.__area
+    
+    @property
+    def list_time_slots(self):
+        return self.__list_time_slots
+    
+    def add_time_slots(self,timeslot : TimeSlot):
+        if isinstance(timeslot,TimeSlot):
+            self.__list_time_slots.append(timeslot)

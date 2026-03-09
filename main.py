@@ -132,9 +132,9 @@ def upgrade_booking_area(
     slot_ids: list[str] = Query(default=["XX-XX-XX"], description="ID ของสล็อตเวลาใหม่ที่ต้องการ ขั้นด้วย , (เช่น AREA-PRIVATE-2-1)")
 ):
     """
-    สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
+    API สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
     ระบบจะทำการเช็คราคาและโควต้า หากผ่านจะนำใบเสนอราคาส่วนต่างใส่ตะกร้าให้โดยอัตโนมัติ
-    จากนั้นให้ลูกค้าไปเรียก checkout ต่อไป
+    จากนั้นให้ลูกค้าไปเรียก API /checkout ต่อไป
     """
     return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, slot_ids)
 
@@ -304,6 +304,38 @@ def process_return_book(no_staff : str,book_id : list[str]):
         สำหรับให้ staff ตรวจสอบหนังสือ
     """
     return bibliohub.process_return_book(no_staff,book_id)
+
+# @app.get("/system/check_upcoming_deadlines", tags=["Notification Scheduler"])
+@mcp.tool
+def check_upcoming_deadlines(
+    current_datetime: str = Query(None,description="รูปแบบ: dd/mm/yyyy HH:MM")):
+
+    """
+        แสดงผลการแจ้งเตือนทั้งหมด ตามเวลาที่กำหนด  (รูปแบบ: dd/mm/yyyy HH:MM เช่น 10/03/2026 14:56)
+    """
+
+    try:
+        dt_obj = datetime.strptime(current_datetime, "%d/%m/%Y %H:%M") if current_datetime else datetime.now()    
+        sent_log = bibliohub.process_notifications(dt_obj)
+
+        if not sent_log:
+            return {
+                "status": "success",
+                "checked_at": dt_obj.strftime("%d/%m/%Y %H:%M"),
+                "message": "ตอนนี้ไม่มีแจ้งเตือนสำหรับลูกค้า",
+                "notifications_sent": []
+            }
+        return {
+            "status": "success",
+            "checked_at": dt_obj.strftime("%d/%m/%Y %H:%M"),
+            "notifications_sent": sent_log
+        }
+    except ValueError:
+        return {
+            "status": "error",
+            "message": "Format วันที่ผิด! กรุณาใช้ dd/mm/yyyy HH:MM"
+
+        }
 
 if __name__ == "__main__":
     # uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)

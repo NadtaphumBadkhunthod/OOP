@@ -1,11 +1,11 @@
-from datetime import datetime
+from datetime import datetime,timedelta
 
 from models.infos import ItemType, BirthMonth, PaymentOptions, ActivityType, ItemStatus, TransactionStatus, PromotionType
 from models.books import Book, BookInfo, BookOrder, BookStock
 from models.areas import Area, TimeSlot
 from models.customers import Customer, Member, Staff, Manager
 from models.transactions import Promotion, Transaction, Notification
-from models.orders import Purchase,UpgradeArea
+from models.orders import Purchase,UpgradeArea,BookingBook
 
 class System:
     def __init__(self):
@@ -473,7 +473,7 @@ class System:
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
-            book = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type).get_book(id)
+            book = self.get_book(series,book_name,author,activity_type,id)
 
             if not book:
                 raise ValueError(f"Book Not Found | id : {id}")
@@ -590,4 +590,92 @@ class System:
         }
 
     def generate_utilization_report(self):
-        pass        
+        pass 
+
+    def should_notify(self, current_time: datetime, item, customer_name: str) -> list:
+        messages_to_send = []
+
+        # Booking Area
+        if isinstance(item, TimeSlot):
+            try:
+                today_str = current_time.strftime("%Y-%m-%d")
+                slot_end = datetime.strptime(f"{today_str} {item.end_time}", "%Y-%m-%d %H:%M")
+                diff = slot_end - current_time
+
+                if timedelta(0) < diff <= timedelta(minutes=10):
+                    messages_to_send.append(
+                        f"แจ้งเตือน: คุณ {customer_name}, พื้นที่จองของคุณ (Slot: {item.slot_id}) "
+                        f"กำลังจะหมดเวลาใช้งานภายใน 10 นาที (ในเวลา {item.end_time} น.)"
+                    )
+                elif diff <= timedelta(0):
+                    messages_to_send.append(
+                        f"หมดเวลา: คุณ {customer_name}, พื้นที่จอง {item.slot_id} "
+                        f"หมดเวลาการใช้งานแล้วเมื่อ {item.end_time} น."
+                    )
+            except ValueError:
+                pass
+
+        # RentBook
+        elif isinstance(item, Book):
+            if item.book_info.activity_type == ActivityType.Rent:
+                deadline = item.end_date
+                diff = deadline - current_time
+                if timedelta(0) <= diff <= timedelta(days=1):
+                    messages_to_send.append(
+                        f"ใกล้ครบกำหนด: คุณ {customer_name}, หนังสือเรื่อง '{item.book_info.name}' "
+                        f"มีกำหนดส่งคืนภายในวันนี้ ({item.end_date.strftime('%d/%m/%Y')})"
+                    )
+                elif diff < timedelta(0):
+                    days_over = abs(diff.days) + (1 if diff.seconds > 0 else 0)
+                    messages_to_send.append(
+                        f"เกินกำหนดคืน: คุณ {customer_name}, หนังสือ '{item.uid}' "
+                        f"เกินกำหนดมาแล้ว {days_over} วัน (กำหนดคืนคือ {item.end_date.date()}) "
+                    )
+
+            # BookingBook
+        elif isinstance(item, BookingBook):
+            deadline = datetime.combine(item.pickup_deadline, datetime.min.time())
+            diff = deadline - current_time
+            # ดึงรายชื่อหนังสือข้างในมาแสดง
+            book_names = ", ".join([b.book_info.name for b in item.get_order])
+            if timedelta(0) <= diff <= timedelta(days=1):
+                messages_to_send.append(
+                    f"แจ้งเตือน: คุณ {customer_name}, หนังสือที่คุณจองไว้ ({book_names})"
+                    f"ต้องมารับภายในวันที่ {item.pickup_deadline.strftime('%d/%m/%Y')}"
+                )
+            elif diff < timedelta(0):
+                messages_to_send.append(
+                    f"หมดเวลารับหนังสือ: คุณ {customer_name}, การจองหนังสือ ({book_names})"
+                    f"หมดกำหนดรับเมื่อ {item.pickup_deadline.strftime('%d/%m/%Y')}"
+                )
+        return messages_to_send    
+
+    def process_notifications(self, current_time: datetime):
+        report = []
+
+        for transaction in self.__transaction_list:
+            customer_obj = transaction.customer
+            order = transaction.order
+
+            items = []
+
+            #Booking area
+
+            if order.booking_area:
+                for booking in order.booking_area:
+                    items.extend(booking.get_order)
+
+            #Rent Book
+            if order.rent_book:
+                items.extend(order.rent_book.get_order)
+
+            # Booking Book
+            if order.booking_book:
+                items.append(order.booking_book)
+
+            for item in items:
+                pending_messages = self.should_notify(current_time, item, customer_obj.name)
+                for msg in pending_messages:
+                    self.notify_user(customer_obj, msg)
+                    report.append({"customer": customer_obj.name, "message": msg})
+        return report 
