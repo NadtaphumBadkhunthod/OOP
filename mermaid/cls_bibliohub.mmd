@@ -5,6 +5,12 @@ config:
 ---
 classDiagram
 direction TB
+class Staff {
+        -Int count$
+        -String no_staff
+        -String __no_branch
+        +process_return(book, customer)
+    }
 
     class ActivityType {
         <<enumeration>>
@@ -59,71 +65,6 @@ direction TB
         Jan - Dec
     }
 
-    class BiblioHubSystem {
-        -List staff_list
-        -List promotion_list
-        -List book_stock
-        -List area
-        -List customer_list
-        -List transaction_list
-        -List notification_list
-        +register()
-        +add_book_stock()
-        +add_staff()
-        +add_promotion()
-        +add_area()
-        +remove_area()
-        +add_strike()
-        +reduce_strike()
-        +notify_user()
-        +upgrade_booking_area()
-        +generate_utilization_report()
-        +check_duplicate_account()
-        +validate_input_data()
-        +get_user_from_phone_number()
-        +search_book()
-        +search_area()
-        +checkout()
-    }
-	
-    class Customer {
-        -String __name
-        -String __surname
-        -String __phonenumber
-        -String __email
-        -List~Transaction~ __transaction
-        -List~Notification~ __notification_list
-        -DateTime __booking_reservation_time
-        -Int __rental_quota
-        -Int __strike
-        -List~Book,Area~ __selected_list
-        +check_eligibility()
-        +check_quota()
-        +select(order)
-        +add_notify(notification)
-        +add_transaction(transaction)
-    }
-
-    class Member {
-        -LevelMember __level_member
-        -BirthMonth __birth_month
-        -Int __points
-        -BookingBookQuota __booking_book_quota
-        -Date __expiration_date
-        +add_point()
-    }
-
-    class Staff {
-        -Int count$
-        -String __no_staff
-        -String __no_branch
-        +process_return(book, customer)
-    }
-
-    class Manager {
-        +print_report()
-    }
-
     class BookInfo {
         -String __name
         -BookStock __book_stock
@@ -162,6 +103,14 @@ direction TB
         +search_book_available(bookname, activity_type)
     }
 
+    class TimeSlot {
+        -Area area
+        -DateTime start_time
+        -DateTime end_time
+        -Bool is_available
+        +update_slot()
+    }
+
     class Area {
         -String area_id
         -String area_type
@@ -173,39 +122,15 @@ direction TB
         +get_rate_info()
     }
 
-    class TimeSlot {
-        -Area area
-        -DateTime start_time
-        -DateTime end_time
-        -Bool is_available
-        +update_slot()
+    class QRCode {
+        -String __name
+        -String __phonenumber
+        +process_payment(Amount)
     }
 
-    class Order {
-        -RentBook __rent_book
-        -Purchase __purchase_book
-        +calculate_subtotal()
-        +confirm()
-    }
-
-    class Purchase {
-        -List~Book,Area~ _order
-        +calculate_subtotal()
-        +confirm()
-    }
-
-    class RentBook {
-        -Float __late_penalty_rate
-        +get_penalty()
-        +confirm()
-    }
-
-    class BookingBook {
-        +confirm()
-    }
-
-    class BookingArea {
-        +confirm()
+    class Cash {
+        -String __name
+        +process_payment(Amount)
     }
 
     class Promotion {
@@ -219,24 +144,47 @@ direction TB
         +payment_unsuccess(customer)
     }
     
+    class Transaction {
+        -Customer __customer
+        -Staff __staff
+        -DateTime __start_date_time
+        -DateTime __end_date_time
+        -String __status
+        -Payment __payment
+        -List __audit_logs_list
+        +update_status(status: TransactionStatus)
+        +add_audit_log(log)
+        +sync_payment_with_activity(rentbook: RentBook)
+    }
+
+    class BookingArea {
+        +confirm()
+    }
+
+    class BookingBook {
+        +confirm()
+    }
+
+    class RentBook {
+        -Float __late_penalty_rate
+        +get_penalty()
+        +confirm()
+    }
+
+    class Purchase {
+        -List~Book,Area~ _order
+        +calculate_subtotal()
+        +confirm()
+    }
+
     class BirthDate
     class DoubleDate
 
-    class PaymentMethod {
-        <<abstract>>
-        +name*
-        +process_payment(Amount)*
-    }
-
-    class Cash {
-        -String __name
-        +process_payment(Amount)
-    }
-
-    class QRCode {
-        -String __name
-        -String __phonenumber
-        +process_payment(Amount)
+    class Order {
+        -RentBook __rent_book
+        -Purchase __purchase_book
+        +calculate_subtotal()
+        +confirm()
     }
 
     class Payment {
@@ -257,17 +205,41 @@ direction TB
         +add_penalty_fee(penalty_fee)
     }
 
-    class Transaction {
-        -Customer __customer
-        -Staff __staff
-        -DateTime __start_date_time
-        -DateTime __end_date_time
-        -String __status
-        -Payment __payment
-        -List __audit_logs_list
-        +update_status(status: TransactionStatus)
-        +add_audit_log(log)
-        +sync_payment_with_activity(rentbook: RentBook)
+    class PaymentMethod {
+        <<abstract>>
+        +name*
+        +process_payment(Amount)*
+    }
+
+    class Manager {
+        +print_report()
+    }
+
+    class BiblioHubSystem {
+        -List staff_list
+        -List promotion_list
+        -List book_stock
+        -List area
+        -List customer_list
+        -List transaction_list
+        -List notification_list
+        +register()
+        +add_book_stock()
+        +add_staff()
+        +add_promotion()
+        +add_area()
+        +remove_area()
+        +add_strike()
+        +reduce_strike()
+        +notify_user()
+        +upgrade_booking_area()
+        +generate_utilization_report()
+        +check_duplicate_account()
+        +validate_input_data()
+        +get_user_from_phone_number()
+        +search_book()
+        +search_area()
+        +checkout()
     }
 
     class Notification {
@@ -276,6 +248,34 @@ direction TB
         -String __message
         -String __uid
     }
+
+    class Customer {
+        -String __name
+        -String __surname
+        -String __phonenumber
+        -String __email
+        -List~Transaction~ __transaction
+        -List~Notification~ __notification_list
+        -DateTime __booking_reservation_time
+        -Int __rental_quota
+        -Int __strike
+        -List~Book,Area~ __selected_list
+        +check_eligibility()
+        +check_quota()
+        +select(order)
+        +add_notify(notification)
+        +add_transaction(transaction)
+    }
+
+    class Member {
+        -LevelMember __level_member
+        -BirthMonth __birth_month
+        -Int __points
+        -BookingBookQuota __booking_book_quota
+        -Date __expiration_date
+        +add_point()
+    }
+
 
     BiblioHubSystem "0..*" <-- "1" BookingArea
     BiblioHubSystem "1" o-- "1..*" Staff
@@ -296,6 +296,7 @@ direction TB
     Purchase <|-- BookingArea
 
     Transaction "1" --> "1" Staff
+
     Payment "1" <-- "1" Transaction
     BookingArea "1" o-- "1..*" TimeSlot
     
