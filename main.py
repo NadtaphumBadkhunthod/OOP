@@ -223,7 +223,7 @@ def process_return_book(no_staff : str,book_id : list[str]):
 # @app.get("/system/check_upcoming_deadlines", tags=["Notification Scheduler"])
 @mcp.tool
 def check_upcoming_deadlines(
-    current_datetime: str = Query(None,description="รูปแบบ: dd/mm/yyyy HH:MM")):
+    current_datetime: str):
 
     """
         แสดงผลการแจ้งเตือนทั้งหมด ตามเวลาที่กำหนด  (รูปแบบ: dd/mm/yyyy HH:MM เช่น 10/03/2026 14:56)
