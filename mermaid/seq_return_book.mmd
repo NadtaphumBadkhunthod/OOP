@@ -1,0 +1,77 @@
+sequenceDiagram
+    actor Customer
+    participant System as BiblioHub
+    participant BookStock
+    participant BookInfo
+    participant Book
+    participant CS as Customer
+
+    Customer ->>+ System: return_book(book_id list[str])
+
+    loop each id in book_id
+        System ->> System: check_type_from_id(id)
+        System -->> System: return Type [ItemType]
+
+        opt Type not Book
+            System --> Customer: return "Need to return a book only" [str]
+        end
+
+        System ->> System: get_data_from_id(type_of_item,id)
+        System -->> System: return data [str]
+
+        System ->> System: get_book_stock(series)
+
+        loop each BookStock in System
+            System ->>+ BookStock: get_name()
+            BookStock -->>- System: return name [str]
+
+            opt series match
+                System -->> System: return bookstock
+            end
+        end
+
+        opt bookstock Not Found
+            System -->> Customer: return "BookStock Not Found"
+        end
+
+        System ->>+ BookStock: get_book_info_by_name(book_name,author,activity_type)
+        loop each BookInfo in BookStock
+            BookStock ->>+ BookInfo: get_name()
+            BookInfo -->>- BookStock: return name [str]
+
+            opt name and author match
+                BookStock -->>- System: return BookInfo
+            end
+        end
+
+        opt BookInfo Not Found
+            System -->> Customer: return "BookInfo Not Found"
+        end
+
+        System ->>+ BookInfo: get_book(id)
+        loop each Book in BookInfo
+            BookInfo ->>+ Book: get_uid()
+            Book -->>- BookInfo: return uid [str]
+        end
+
+        opt uid match
+            BookInfo -->>- System: return Book
+        end
+
+        System ->>+ Book: get_status()
+        Book -->>- System: return status
+
+        opt status is not Confirm or InUse 
+            System -->> Customer : return "book is not in use"
+        end
+
+        System ->>+ Book: change_status(ItemStatus.NotAvailable)
+        Book -->>- System: return "Change status successful"
+
+        System ->>+ Book: get_customer()
+        Book -->>- System: return customer [Customer]
+
+        System ->>+ CS: decrease book_rented
+        CS -->>- System: return "decrease successful"
+        System -->>- Customer: "Return Successful"
+    end
