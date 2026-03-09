@@ -755,8 +755,8 @@ class System:
                 elif diff < timedelta(0):
                     days_over = abs(diff.days) + (1 if diff.seconds > 0 else 0)
                     messages_to_send.append(
-                        f"เกินกำหนดคืน: คุณ {customer_name}, หนังสือ '{item.book_info.name}' "
-                        f"เกินกำหนดมาแล้ว {days_over} วัน (กำหนดคืนคือ {item.end_date}) "
+                        f"เกินกำหนดคืน: คุณ {customer_name}, หนังสือ '{item.uid}' "
+                        f"เกินกำหนดมาแล้ว {days_over} วัน (กำหนดคืนคือ {item.end_date.date()}) "
                     )
 
             # BookingBook
