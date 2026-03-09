@@ -145,7 +145,10 @@ class Payment:
 
     def calculate_net_amount(self):
         self.__net_amount = 0
-        self.__net_amount += self.calculate_subtotal()
+        try : 
+            self.__net_amount += self.calculate_subtotal()
+        except:
+            raise ValueError("Calculate Subtotal")
         self.__net_amount += self.__upgrade_delta - abs(self.__discount_amount) + self.__base_fee + self.__penalty_fee
         return self.__net_amount
     

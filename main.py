@@ -86,14 +86,14 @@ def upgrade_booking_area(
     phonenumber: str,
     old_area_id: str,
     new_area_id: str,
-    slot_ids: list[str]
+    new_slot_ids: list[str]
 ):
     """
     สำหรับส่งคำร้องขออัปเกรดพื้นที่
     ระบบจะทำการเช็คราคาและโควต้า หากผ่านจะนำใบเสนอราคาส่วนต่างใส่ตะกร้าให้โดยอัตโนมัติ
     จากนั้นให้ลูกค้าไปเรียก checkout ต่อไป
     """
-    return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, slot_ids)
+    return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, new_slot_ids)
 
 def format_book_info(book : BookInfo):
     return {

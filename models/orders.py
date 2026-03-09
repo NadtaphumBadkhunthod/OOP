@@ -112,7 +112,7 @@ class Purchase:
         return self._order
 
     def calculate_subtotal(self):
-        return sum((item.book_info.price * (item.end_date - item.start_date).days if isinstance(item, Book) else item.price) for item in self._order)   
+        return sum((item.book_info.price if isinstance(item, Book) else item.price) for item in self._order)   
     
     def confirm(self):
         for item in self._order:
@@ -133,6 +133,9 @@ class RentBook(Purchase):
     def confirm(self):
         for item in self._order:
             item.change_status(ItemStatus.Confirm)
+
+    def calculate_subtotal(self):
+        return sum((item.book_info.price * (item.end_date - item.start_date).days if isinstance(item, Book) else item.price) for item in self._order)   
     
 class BookingArea(Purchase):
     def __init__(self, order : list[Book | TimeSlot]):
