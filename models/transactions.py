@@ -1,5 +1,4 @@
 from __future__ import annotations
-from fastapi import HTTPException, status
 import uuid
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -29,11 +28,8 @@ class Promotion:
         if isinstance(customer,Customer):
             if self.type == PromotionType.BirthMonth:
                 if not isinstance(customer,Member):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="This Promotion Need to be used by Member only"
-                    )
-                
+                    raise ValueError("This Promotion Need to be used by Member only")
+            
             return customer not in self.__used_user and promocode == self.__promo_code
         
     def apply_discount(self,price,customer,promocode):
@@ -43,10 +39,7 @@ class Promotion:
                     if self.is_eligible(customer,promocode):
                         self.__used_user.append(customer)
                         return self.calculate_discount(customer,price)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Promotion is not Available"
-        )
+        raise ValueError("Promotion is not Available")
 
     def change_stauts(self,status : ItemStatus):
         self.__status = status
@@ -74,10 +67,7 @@ class Payment:
         elif payment_method == PaymentOptions.qr_code:
             self.__payment_method = QRCode(self.__customer.phonenumber)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Payment Options Not Found : {payment_method} {type(payment_method)}"
-            )
+            raise ValueError(f"Payment Options Not Found : {payment_method} {type(payment_method)}")
         
         self.__base_fee = 10 # เท่าไหร่อ่ะ need implement
         self.__upgrade_delta = 0
@@ -155,7 +145,10 @@ class Payment:
 
     def calculate_net_amount(self):
         self.__net_amount = 0
-        self.__net_amount += self.calculate_subtotal()
+        try : 
+            self.__net_amount += self.calculate_subtotal()
+        except:
+            raise ValueError("Calculate Subtotal")
         self.__net_amount += self.__upgrade_delta - abs(self.__discount_amount) + self.__base_fee + self.__penalty_fee
         return self.__net_amount
     
@@ -210,19 +203,13 @@ class Transaction:
     def order(self):
         return self.__payment.order
     
-    @order.setter
-    def order(self,selected_list : list[BookOrder | TimeSlot]):
-        rent_list = [order.book_info.search_book_available().calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
-        purchase_list = [order.book_info.search_book_available() for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
+    def make_order(self,customer : Customer):
+        selected_list : list[BookOrder | TimeSlot] = customer.get_selected_list
+        rent_list = [order.book_info.search_book_available(customer).calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
+        purchase_list = [order.book_info.search_book_available(customer) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
         area_list = {}
         upgrade_list = [item for item in selected_list if isinstance(item, UpgradeArea)]
-        booking_list = [order.book_info.search_book_incoming() for order in selected_list if isinstance(order, BookOrder) and order.book_info.activity_type == ActivityType.Booking]
-        
-        if len(booking_list) > 0:
-            if hasattr(self.__customer, 'book_booked'):
-                self.__customer.book_booked += len(booking_list)
-            self.__payment.order.booking_book = booking_list
-            
+
         current_time = datetime.now().time()
         
         for areatype in AreaType:
@@ -232,10 +219,7 @@ class Transaction:
                     # แปลงเวลามาเช็ค
                     slot_start_time = datetime.strptime(item.start_time, "%H:%M").time()
                     if slot_start_time <= current_time:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"สล็อตเวลา {item.start_time}-{item.end_time} ผ่านไปแล้ว ไม่สามารถชำระเงินได้"
-                        )
+                        raise ValueError(f"สล็อตเวลา {item.start_time}-{item.end_time} ผ่านไปแล้ว ไม่สามารถชำระเงินได้")
                         
                     if item.area.area_type == areatype:
                         area_in_type_list.append(item)
@@ -255,22 +239,15 @@ class Transaction:
             for upg in upgrade_list:
                 self.add_upgrade_order(upg)
         
-        
-        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0 or len(booking_list) > 0):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="activity type not found"
-            )
+        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0):
+            raise ValueError("activity type not found")
         
     
     def get_current_booking_area(self, old_area_id: str) -> BookingArea:
         for booking_area in self.__payment.order.booking_area:
             if booking_area.area.area_id == old_area_id:
                 return booking_area
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"ไม่พบพื้นที่การจองเดิมรหัส {old_area_id} ใน Transaction นี้"
-        )
+        raise ValueError(f"ไม่พบพื้นที่การจองเดิมรหัส {old_area_id} ใน Transaction นี้")
     
     def add_upgrade_order(self, upgrade_item: UpgradeArea):
         # ยัดใส่ตะกร้า

@@ -39,7 +39,6 @@ class PaymentOptions(str,Enum):
 
 class ActivityType(str, Enum):
     Rent = "Rent"
-    Booking = "Booking"
     Purchase = "Purchase"
     All = "All"
 
