@@ -201,8 +201,8 @@ class Staff(Member):
         # Need implement
 
 class Manager(Staff):
-    def __init__(self, name, surname, phonenumber, email, birth_month, no_branch):
-        super().__init__(name, surname, phonenumber, email, birth_month, no_branch)
+    def __init__(self, customer : Customer, birth_month):
+        super().__init__(customer, birth_month)
     
     def print_report(self):
         pass
