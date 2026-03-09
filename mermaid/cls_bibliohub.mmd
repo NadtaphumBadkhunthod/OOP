@@ -51,6 +51,7 @@ direction TB
         -String __id
         +add_copies(copies: int)
         +search_book_available()
+        +search_book_incoming()
     }
 
     class Book {
@@ -63,6 +64,7 @@ direction TB
         -Date __actual_return_date
         +calculate_end_date(how_many_days: int)
         +check_available()
+        +check_incoming()
         +change_status(status: BookStatus)
         +change_activity_type(activity_type: ActivityType)
     }
@@ -71,6 +73,7 @@ direction TB
         -String __name
         -List~BookInfo~ __forsale_book_list
         -List~BookInfo~ __rent_book_list
+        -List~BookInfo~ __booking_book_list
         +get_book_list(activity_type: ActivityType)
         +add_book_info(book_info: BookInfo, activity_type: ActivityType)
         +remove_book(book)

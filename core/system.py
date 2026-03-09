@@ -2,7 +2,7 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 from datetime import datetime
 
-from models.infos import ItemType, BirthMonth, PaymentOptions, ActivityType, ItemStatus, TransactionStatus, PromotionType
+from models.infos import ItemType, BirthMonth, PaymentOptions, ActivityType, ItemStatus, TransactionStatus, PromotionType, AreaType
 from models.books import Book, BookInfo, BookOrder, BookStock
 from models.areas import Area, TimeSlot
 from models.customers import Customer, Member, Staff, Manager
@@ -291,8 +291,8 @@ class System:
                         detail=f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)"
                     )
                 
-                current_time = datetime.now().time()
-                #current_time = datetime.strptime("13:00", "%H:%M").time()
+                #current_time = datetime.now().time()
+                current_time = datetime.strptime("08:00", "%H:%M").time()
                 slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
                 
                 if slot_start_time <= current_time:
@@ -400,7 +400,8 @@ class System:
                 detail="No Order"
             )
 
-        transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
+        #transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
+        transaction = Transaction(customer,staff,payment_method,datetime.strptime("08:00", "%H:%M").time(),datetime.strptime("08:00", "%H:%M").time())
         transaction.order = customer.get_selected_list
 
         transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}") #need implement : เพิ่มรูปแบบของ audit log
@@ -717,4 +718,75 @@ class System:
         }
 
     def generate_utilization_report(self):
-        pass        
+        revenue_rent = 0
+        revenue_purchase = 0
+        revenue_area = 0  
+        total_system_slots = 0
+
+        book_popularity = {} 
+        area_usage = {area_type.value: 0 for area_type in AreaType} 
+        member_counts = {"Silver": 0, "Gold": 0, "Platinum": 0} 
+
+        for trans in self.__transaction_list:
+            if trans.status == TransactionStatus.Confirm or trans.status == TransactionStatus.Confirm.value:
+                order_obj = trans.order
+                all_items = []
+
+                if order_obj.rent_book:
+                    all_items.extend(order_obj.rent_book.get_order)
+                if order_obj.purchase_book:
+                    all_items.extend(order_obj.purchase_book.get_order)
+                if order_obj.booking_book:
+                    all_items.extend(order_obj.booking_book.get_order)
+                if order_obj.booking_area:
+                    for area_booking in order_obj.booking_area:
+                        all_items.extend(area_booking.get_order)
+                
+                for item in all_items: 
+                    if isinstance(item, Book):
+                        info = item.book_info
+                        book_popularity[info.name] = book_popularity.get(info.name, 0) + 1
+                        if info.activity_type == ActivityType.Rent:
+                            revenue_rent += info.price
+                        elif info.activity_type == ActivityType.Purchase:
+                            revenue_purchase += info.price
+                    elif isinstance(item, TimeSlot):
+                        revenue_area += item.area.hourly_rate
+                        area_type_str = item.area.area_type.value
+                        if area_type_str in area_usage:
+                            area_usage[area_type_str] += 1
+
+        total_system_slots = sum(len(area.list_timeslot) for area in self.__area)
+        total_booked_slots = sum(area_usage.values())
+        utilization_rate = (total_booked_slots / total_system_slots * 100) if total_system_slots > 0 else 0
+
+        for customer in self.__customer_list:
+            if isinstance(customer, Member):
+                level = customer.level_member.name
+                if level in member_counts:
+                    member_counts[level] += 1
+
+        top_books = dict(sorted(book_popularity.items(), key=lambda x: x[1], reverse=True)[:5])
+
+        return {
+            "report_info": {
+                "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "total_transactions": len(self.__transaction_list)
+            },
+            "financial_report": {
+                "rent_revenue": revenue_rent,
+                "purchase_revenue": revenue_purchase,
+                "area_revenue": revenue_area,
+                "total_revenue": revenue_rent + revenue_purchase + revenue_area
+            },
+            "area_utilization": {
+                "overall_utilization_percent": f"{utilization_rate:.2f}%",
+                "total_slots_available": total_system_slots,
+                "total_slots_booked": total_booked_slots,
+                "booked_by_type": area_usage
+            },
+            "inventory_insights": {
+                "top_5_books": top_books
+            },
+            "membership_data": member_counts
+        }

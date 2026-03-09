@@ -222,8 +222,9 @@ class Transaction:
             if hasattr(self.__customer, 'book_booked'):
                 self.__customer.book_booked += len(booking_list)
             self.__payment.order.booking_book = booking_list
-            
-        current_time = datetime.now().time()
+
+        # current_time = datetime.now().time()
+        current_time = datetime.strptime("08:00", "%H:%M").time()
         
         for areatype in AreaType:
             area_in_type_list = []

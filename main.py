@@ -1,11 +1,12 @@
 from __future__ import annotations
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException, status
 from fastapi.responses import RedirectResponse
 from datetime import datetime, date
 import uvicorn
 
 from models.infos import BirthMonth, PaymentOptions, ActivityType, PromotionType
 from models.books import BookInfo, TypeBook
+from models.customers import Manager
 from datebase.init_data import mock_data
 
 bibliohub, AreaOption = mock_data()
@@ -210,6 +211,31 @@ def get_transaction(phonenumber:str):
             "net amount" : transaction.payment.net_amount
         }
     } for transaction in customer.get_all_transaction]
+
+@app.get("/manager/report", tags=["For Manager"])
+def get_manager_report(no_staff: str = Query(..., description="รหัสพนักงานของผู้จัดการ (เช่น STF-0)")):
+    """
+    API สำหรับผู้จัดการ (Manager) เพื่อดึงรายงานสรุปผลการดำเนินงานของระบบ
+    ระบบจะทำการตรวจสอบสิทธิ์ว่าพนักงานคนดังกล่าวเป็น Manager หรือไม่ก่อนแสดงผล
+    """
+    employee = bibliohub.get_staff_by_no_staff(no_staff)
+
+    if not isinstance(employee, Manager):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="สิทธิ์ไม่เพียงพอ: เฉพาะพนักงานระดับ Manager เท่านั้นที่สามารถเข้าถึงรายงานนี้ได้"
+        )
+    
+    report_data = employee.print_report(bibliohub)
+    
+    return {
+        "status": "Success",
+        "manager_info": {
+            "name": f"{employee.name} {employee.surname}",
+            "no_staff": employee.no_staff
+        },
+        "report": report_data
+    }
 
 @app.get("/return_book",tags=["Book"])
 def return_book(phonenumber:str,book_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id")):
