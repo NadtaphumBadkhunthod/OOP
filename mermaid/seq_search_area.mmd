@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    actor Customer as Member / NonMember
+    participant System as BiblioHubSystem
+    participant CustObj as Customer Object
+    participant AreaObj as Area
+    participant Slot as TimeSlot    
+
+    Customer->>System: search_area(phonenumber, area_id)
+    activate System
+    
+    System->>CustObj: check_eligibility()
+    CustObj-->>System: return status (True/False)
+    
+
+    System->>AreaObj: list_timeslot
+    activate AreaObj
+    loop ค้นหา TimeSlot ใน Area
+        AreaObj->>Slot: check is_available & start_time
+        Slot-->>AreaObj: return status & time
+        Note right of AreaObj: กรองเฉพาะสล็อตที่ว่าง<br/>และยังไม่ถึงเวลาจอง
+    end
+    AreaObj-->>System: return available_slots
+    deactivate AreaObj
+
+    System-->>Customer: return {"area_id": area_id, "available_slots": available_slots}
+    deactivate System
