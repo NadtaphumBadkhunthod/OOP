@@ -1,42 +1,68 @@
 ---
 config:
   layout: elk
-
+  theme: redux_dark
 ---
 classDiagram
 direction TB
-    class Staff {
-	    -no_staff
-	    -name
-	    -no_branch "อยู่สาขาไหนจ๊ะ"
-	    +process_return(book,customer)
+class Staff {
+        -Int count$
+        -String no_staff
+        -String __no_branch
+        +process_return(book, customer)
     }
 
+    class ActivityType {
+        <<enumeration>>
+        Rent
+        Purchase
+    }
     class TypeBook {
-	    Manga
-	    Novel
-	    Historical
-	    Education
-	    Self_improvement
-	    Economic
+        <<enumeration>>
+        Manga
+        Novel
+        Historical
+        Education
+        Self_improvement
+        Economic
     }
-
-    class Book {
-	    -String book_name
-	    -String book_series
-	    -String book_uid
-	    -String author
-	    -String category
-	    -Float price
-	    -String activity_type "เช่า / ขาย"
-	    -Int total_borrowed_count
-	    -String book_status "Selected, Available, Incoming, Not Available"
-	    -DateTime available_date
-	    +check_availability()
-	    +change_status()
-	    +get_rate_info()
-        +change_activity_type()
-        +get_activity_type()
+    class BookStatus {
+        <<enumeration>>
+        Available
+        UnAvailable
+        Selected
+        Purchased
+        Incoming
+    }
+    class PaymentStatus {
+        <<enumeration>>
+        Unpaid
+        Paid
+        Voied
+    }
+    class TransactionStatus {
+        <<enumeration>>
+        Requested
+        Confirm
+        In_Use
+        Completed
+        Cancelled
+    }
+    class BookingBookQuota {
+        <<enumeration>>
+        Silver
+        Gold
+        Platinum
+    }
+    class LevelMember {
+        <<enumeration>>
+        Silver
+        Gold
+        Platinum
+    }
+    class BirthMonth {
+        <<enumeration>>
+        Jan - Dec
     }
 
     class BookInfo {
@@ -78,103 +104,111 @@ direction TB
     }
 
     class TimeSlot {
-	    -Area area "เก็บว่ามาจากไหน"
-	    -DateTime start_time
-	    -DateTime end_time
-	    -Bool is_available
-	    +update_slot()
+        -Area area
+        -DateTime start_time
+        -DateTime end_time
+        -Bool is_available
+        +update_slot()
     }
 
     class Area {
-	    -String area_id
-	    -String area_type
-	    -Float hourly_rate "ค่าบริการรายชั่วโมง"
-	    -List feature[]
-	    -Int capacity
-	    -List slots[] "มีสล๊อตไหนบ้าง"
-	    +list_timeslot()
-	    +get_rate_info()
+        -String area_id
+        -String area_type
+        -Float hourly_rate
+        -List feature
+        -Int capacity
+        -List slots
+        +list_timeslot()
+        +get_rate_info()
     }
 
     class QRCode {
-	    -String gateway_reference
-	    +process_payment()
+        -String __name
+        -String __phonenumber
+        +process_payment(Amount)
     }
 
     class Cash {
-	    +process_payment()
+        -String __name
+        +process_payment(Amount)
     }
 
     class Promotion {
-	    -String promo_code
-	    -Float discount_rate
-	    -Bool is_active
-        -String type_promotion
-	    -List Used_User
-	    +is_eligible()
-	    +apply_discount()
+		<<abstract>>
+        -String __promo_code
+        -Float __discount_rate
+        -Bool __status
+        -List __used_user
+        +is_eligible(customer)
+        +apply_discount(price, customer)
+        +payment_unsuccess(customer)
     }
+    
     class Transaction {
-	    -Customer user "ผู้ทำรายการ"
-	    -Staff staff "staff_obj"
-	    -DateTime start_date_time "วันที่เริ่มรายการ"
-	    -DateTime end_date_time "กำหนดการสิ้นสุด"
-	    -String status "Requested, Confirmed, In Use, Completed, Cancelled"
-	    -Payment payment "เอาทั้งobjectPaymentมาใส่เลย"
-	    -List audit_logs_list[] "บันทึกการแก้ไขข้อมูลในรายการนี้"
-	    +update_status()
-	    +add_audit_log() "Log of Transaction"
-	    +sync_payment_with_activity() "ดึงค่าปรับจาก RentBook มาใส่ Payment"
+        -Customer __customer
+        -Staff __staff
+        -DateTime __start_date_time
+        -DateTime __end_date_time
+        -String __status
+        -Payment __payment
+        -List __audit_logs_list
+        +update_status(status: TransactionStatus)
+        +add_audit_log(log)
+        +sync_payment_with_activity(rentbook: RentBook)
     }
 
     class BookingArea {
-        -List reserved_slots[]
-        +calculate_total_price()
-        +request_upgrade() "request กลับระบบไป search area"
-        +calculate_upgrade_delta()
-        +update_reserved_slots()
+        +confirm()
     }
 
     class BookingBook {
-        -List book_list[]
-        -DateTime reservation_date "วันที่จองหนังสือ"
-        -DateTime pickup_deadline"เวลาสุดท้ายที่ต้องมารับหนังสือ"
-        +check_pickup_deadline()
-        +calculate_total_books()
+        +confirm()
     }
 
     class RentBook {
-        -DateTime rental_date "วันที่เช่าตามกำหนด"
-        -DateTime due_date "วันที่ต้องคืนตามกำหนด"
-        -DateTime actual_return_date"วันที่คืนจริง"
-        -Float late_penalty_rate"อัตราค่าปรับต่อวันของหนังสือเล่มนั้น"
-        +calculate_late_penalty()
+        -Float __late_penalty_rate
+        +get_penalty()
+        +confirm()
     }
 
     class Purchase {
-        -List purchase_items[]
+        -List~Book,Area~ _order
         +calculate_subtotal()
+        +confirm()
+    }
+
+    class BirthDate
+    class DoubleDate
+
+    class Order {
+        -RentBook __rent_book
+        -Purchase __purchase_book
+        +calculate_subtotal()
+        +confirm()
     }
 
     class Payment {
-        -String payment_no "เลขสลีปปื้ง"
-        -String status"Unpaid, Paid, Voided"
-        -List order "เก็บก้อน BookingCafe/BookingBook/RentBook/Purchase"
-        -DateTime timestamp
-        -String payment_method
-        
-        -base_fee"ค่าบริการหลัก"
-        -upgrade_delta"ยอดส่วนต่างจากการอัปเกรด"
-        -discount_amount"ยอดส่วนลด"
-        -penalty_fee"ค่าปรับทั้งหมด"
-        -net_amount"ยอดสุทธิที่ต้องจ่าย"
+        -Int count$
+        -Customer __customer
+        -String __payment_no
+        -String __status
+        -Order __order
+        -DateTime __timestamp
+        -PaymentMethod __payment_method
+        -Float __base_fee
+        -Float __upgrade_delta
+        -Float __discount_amount
+        -Float __penalty_fee
+        -Float __net_amount
         +calculate_net_amount()
-        +update_payment_status()
-        +add_penalty_fee()
+        +update_payment_status(status: PaymentStatus)
+        +add_penalty_fee(penalty_fee)
     }
 
     class PaymentMethod {
-        +process_payment()
+        <<abstract>>
+        +name*
+        +process_payment(Amount)*
     }
 
     class Manager {
@@ -182,69 +216,63 @@ direction TB
     }
 
     class BiblioHubSystem {
-        -List staff_list[]
-        -List promotion_list[]
-        -List book_stock[]
-        -List area[]
-        -List customer_list[]
-        -List transaction_list[]
-        -List notification_list[]
+        -List staff_list
+        -List promotion_list
+        -List book_stock
+        -List area
+        -List customer_list
+        -List transaction_list
+        -List notification_list
         +register()
-        +delete_member()
-        +check_duplicate_account()
-        +validate_input_data()
-
-        +get_user_from_phone_number()
-        +search_book()
-        +search_area()
-        +validate_booking_conflict()
-        +checkout()
-        +create_transaction()
-        +verify_permission()
         +add_book_stock()
         +add_staff()
         +add_promotion()
         +add_area()
         +remove_area()
         +add_strike()
-        +remove_strike()
+        +reduce_strike()
         +notify_user()
-        +upgrade_booking_area()"อัพเกรดarea"
+        +upgrade_booking_area()
         +generate_utilization_report()
+        +check_duplicate_account()
+        +validate_input_data()
+        +get_user_from_phone_number()
+        +search_book()
+        +search_area()
+        +checkout()
     }
 
     class Notification {
-        -String message
-        -Customer target_user
-        -String notification_id
-        +send_message() "send_expiry_alert(transaction, lead_time) "
+        -Int count$
+        -Customer __customer
+        -String __message
+        -String __uid
     }
 
     class Customer {
-        -String name
-        -String surname
-        -Int phonenumber
-        -String email
-        -List transaction[]
-        -List notification_list[]
-        -DateTime booking_reservation_time "แต่ละระดับจะมีค่าไม่เท่ากัน"
-        -Int rental_quota "แต่ละระดับจะมีค่าไม่เท่ากัน"
-        -Int strike "จำนวนการเตือน"
-        -List select[] "เลือกอะไรจากร้านบ้าง"
-        +check_eligibility() "เช็คสิทธิ์ในการทำรายการ : มีหนี้ หรือ ประวัติไม่ดี"
+        -String __name
+        -String __surname
+        -String __phonenumber
+        -String __email
+        -List~Transaction~ __transaction
+        -List~Notification~ __notification_list
+        -DateTime __booking_reservation_time
+        -Int __rental_quota
+        -Int __strike
+        -List~Book,Area~ __selected_list
+        +check_eligibility()
         +check_quota()
-        +select() "ไปเอา return มาจากระบบตอน search"
-        +unselect()
-        +add_notify()
-        +add_transaction()
+        +select(order)
+        +add_notify(notification)
+        +add_transaction(transaction)
     }
 
     class Member {
-        -String level_member
-        -Int birth_month
-        -Int points
-        -Int booking_book_quota "ต่างกันในแต่ละรดับ"
-        -DateTime expiration_date
+        -LevelMember __level_member
+        -BirthMonth __birth_month
+        -Int __points
+        -BookingBookQuota __booking_book_quota
+        -Date __expiration_date
         +add_point()
     }
     class UpgradeArea {
@@ -259,14 +287,14 @@ Purchase <|-- UpgradeArea
 UpgradeArea "1" --> "1" BookingArea : old_booking
 UpgradeArea "1" o-- "1..*" TimeSlot : new_slots
 
-<<abstract>> PaymentMethod
 
     BiblioHubSystem "0..*" <-- "1" BookingArea
     BiblioHubSystem "1" o-- "1..*" Staff
     BiblioHubSystem "1" o-- "1..*" Area
     BiblioHubSystem "1" o-- "0..*" Customer
     BiblioHubSystem "1" o-- "0..*" Transaction
-    BiblioHubSystem "1" o-- "0..*" Promotion
+    BiblioHubSystem "1" o-- "0..*" BirthDate
+    BiblioHubSystem "1" o-- "0..*" DoubleDate
     BiblioHubSystem "1" o-- "1..*" BookStock
     BiblioHubSystem "1" o-- "0..*" Notification
 
@@ -283,20 +311,18 @@ UpgradeArea "1" o-- "1..*" TimeSlot : new_slots
     Payment "1" <-- "1" Transaction
     BookingArea "1" o-- "1..*" TimeSlot
     
-    BookingBook "1" --> "0..*" Book
-    RentBook "1" --> "0..*" Book
-    Purchase "1" --> "0..*" Book
- 
-    Purchase "0.." --o "1" Payment
+    Order "1" *-- "1" Purchase
+    Order "1" *-- "1" RentBook
+    Order "1" *-- "0..1" BookingBook
+    Order "1" *-- "0..1" BookingArea
     
-    Transaction "0..*" <--> "1" Customer
-    Book --> TypeBook
+    Payment "1" *-- "1" Order
+	Payment "1" o-- "1" PaymentMethod
     BookInfo "1" *-- "0..*" Book
     BookStock "1" o-- "0..*" BookInfo
-    Area "1" o-- "0..*" TimeSlot
-    Payment --> PaymentMethod
 
-    QRCode --|> PaymentMethod
-    Cash --|> PaymentMethod
-
-    Notification "0..*" --o "1" Customer
+	BirthDate "1" --|> Promotion
+	DoubleDate "1" --|> Promotion
+    
+    PaymentMethod <|-- Cash
+    PaymentMethod <|-- QRCode

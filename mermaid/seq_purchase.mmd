@@ -1,95 +1,114 @@
 sequenceDiagram
     autonumber
-    actor US as User
+    actor CS as Customer
+    actor MB as Member
     participant SYS as System
-    participant CS as Customer
     participant BS as BookStock
-    participant BI as BookInfo
+    participant BN as BookName
     participant BK as Book
 
-    Note over US, SYS: --- PURCHASE SEARCH PHASE ---
-    US->>SYS: search_book(phone, series) 
-    activate SYS
-    
-    SYS->>SYS: get_customer_by_phone(phone)
-    
-    loop check_eligibility in Customer
-        SYS ->> CS: check_eligibility()
-        activate CS
-        CS -->> SYS: return bool
-        deactivate CS
-    end
-    loop search_book
-        SYS ->> SYS: search_book(book_series)
-        SYS ->> BS: search_book_available(name, activity_type = "Purchase")
-        activate BS
-        BS ->> BI: search_book_available()
-        activate BI
-        loop check_available
-            BI ->> BK: check_available()
-            activate BK
-            BK -->> BI: return status
-            deactivate BK
-        end
-        BI -->> BS: return available_status
-        deactivate BI
-        BS -->> SYS: return available_book
-        deactivate BS
-        SYS -->> US: return bookstock[object]
-    end
-    deactivate SYS
-
-
-    Note over US, SYS: --- SELECT BOOK PHASE ---
     loop Select Book
-        US ->> SYS: select_book(phone, book_name, activity_type = "Purchase")
-        activate SYS
-        SYS ->> SYS: get_customer_by_phone(phone)
-        SYS ->> SYS: get_bookinfo(series, name, activity_type)
+        CS ->> SYS : search_book(book_series, bookname, activity_type="Purchase")
+        SYS ->> CS : check_eligibility()
+        CS -->> SYS : return eligibility_status [bool]
 
-        SYS ->> BS: search_bookinfo(name, activity_type = "Purchase")
-        activate BS
-        BS ->> BI: get_bookinfo()
-        activate BI
-        BI -->> BS: return bookinfo
-        deactivate BI
-        BS -->> SYS: return bookinfo
-        deactivate BS
+        alt eligible
+            SYS ->> BS : search_book_available(bookname, "Purchase")
+            BS ->> BN : search_book_available()
+            BN ->> BK : check_availability()
+            BK -->> BN : return available [bool]
+            BN -->> BS : return book_object
+            BS -->> SYS : return book_object
+            SYS ->> CS : add_search_result(book_object)
+            SYS -->> CS : return search_results [dict]
 
-        SYS ->> CS: select(book)
-        activate CS
-        create participant BO as BookOrder
-        CS ->> BO: BookOrder(BookInfo)
-        activate BO
-        BO -->> CS: return book_order
-        deactivate BO
-        CS -->> SYS: return selected_list[]
-        deactivate CS
-        SYS -->> US: return selected_list[]
-        deactivate SYS
-    end
+            alt Book available
+                SYS -->> CS : return book_object
 
-    Note over US, SYS: --- CHECKOUT PHASE ---
-    US ->> SYS: checkout_purchase(phonenumber, payment_method)
-    activate SYS
-    
-    loop check Book attribute selected_list in customer
-        alt Book in customer (Success Case)
-            loop check activity_type Book
-                alt activity_type is "Purchase"
-                    create participant PS as Purchase
-                    SYS ->> PS: create_purchase(order)
-                    activate PS
-                    PS -->> SYS: return Purchase Object
-                    deactivate PS
-                    SYS ->> SYS: checkout(customer, Staff(), [order], payment_method) 
-                    SYS -->> US: return Completed. Total payment made net_amount bath
-                else
-                    SYS -->> US: return activity_type is "Rent"
+                opt Want that book
+                    CS ->> CS : select(book)
+                    CS ->> BK : change_status(Status.Selected)
                 end
+
+                opt Already selected and don't want it
+                    CS ->> CS : unselect(book)
+                    CS ->> BK : change_status(Status.Available)
+                end
+
+            else Not available
+                SYS -->> CS : No Book Available
             end
-        else not Book in customer (Failure Case)
-            SYS -->> US: return Don't has Purchase
+
+        else Not eligible (strike >= 3)
+            SYS -->> CS : You can't buy or rent
         end
     end
-    deactivate SYS
+
+    CS ->> SYS : checkout(customer, staff, selected_list, payment_method)
+
+    loop All items in selected_list
+        SYS ->> BK : get_activity_type()
+        BK -->> SYS : return "Purchase"
+
+        opt is Purchase
+            create participant PC as Purchase
+            SYS ->> PC : Purchase([book])
+        end
+    end
+
+    create participant PS as Payment
+    SYS ->> PS : Payment(customer, order_list, payment_method)
+    PS -->> SYS : return payment [object]
+
+    SYS ->> PS : calculate_net_amount()
+    PS -->> SYS : return net_amount [float]
+
+    alt payment_method == "QRCode"
+        create participant QR as QRCode
+        SYS ->> QR : QRCode(gateway_reference)
+        SYS ->> QR : process_payment(net_amount)
+        QR -->> SYS : return True
+    else payment_method == "Cash"
+        create participant CA as Cash
+        SYS ->> CA : Cash()
+        SYS ->> CA : process_payment(net_amount)
+        CA -->> SYS : return True
+    end
+
+    SYS ->> PS : update_payment_status("Paid")
+
+    create participant TS as Transaction
+    SYS ->> TS : Transaction(customer, staff, datetime.now(), payment)
+    TS -->> SYS : return transaction [object]
+
+    SYS ->> TS : add_audit_log(f"request: {datetime.now()}")
+    SYS ->> TS : update_status("Confirm")
+
+    loop All Purchase items
+        loop Each book in purchase_items
+            SYS ->> BK : change_status(Status.Purchased)
+            BK -->> SYS : change_status successful
+        end
+    end
+
+    SYS ->> CS : add_transaction(transaction)
+    CS -->> SYS : return add_transaction successful
+
+    SYS ->> SYS : notify_user(customer, "{name}: transaction ... confirm")
+    create participant NT as Notification
+    SYS ->> NT : Notification(customer, "{name}: transaction ... confirm")
+    NT -->> SYS : return notification [object]
+    SYS ->> CS : add_notify(notification)
+    CS -->> SYS : return add_notify successful
+
+    opt is Member
+        SYS ->> MB : add_point()
+
+        SYS ->> SYS : notify_user(customer, "{name}: add point successful")
+        SYS ->> NT : Notification(customer, "{name}: add point successful")
+        NT -->> SYS : return notification [object]
+        SYS ->> CS : add_notify(notification)
+        CS -->> SYS : return add_notify successful
+    end
+
+    SYS -->> CS : return "ทำรายการเสร็จสิ้น"
