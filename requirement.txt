@@ -1,6 +1,0 @@
-FROM python:3.13
-WORKDIR /OOP
-COPY requirement.txt .
-RUN pip install -r requirement.txt
-COPY src/ .
-CMD ["python", "./server.py"]

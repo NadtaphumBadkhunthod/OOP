@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fastmcp import FastMCP
-from datetime import datetime, date
+from datetime import datetime
 
 from models.infos import BirthMonth, PaymentOptions, ActivityType, PromotionType
 from models.books import BookInfo, TypeBook
