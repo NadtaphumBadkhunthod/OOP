@@ -1,4 +1,5 @@
 from datetime import datetime,timedelta
+from __future__ import annotations
 
 from models.infos import ItemType, BirthMonth, PaymentOptions, ActivityType, ItemStatus, TransactionStatus, PromotionType
 from models.books import Book, BookInfo, BookOrder, BookStock
@@ -34,12 +35,11 @@ class System:
         :param phonenumber: phonenumber of customer
         :param email: email of customer
         """
-        
+
         if isinstance(customer,Member):
-            raise PermissionError("Customer already a member")
+            raise ValueError("Customer is already a member")
         
         member = Member(customer,birth_month)
-        self.delete_customer(customer)
         self.__customer_list.append(member)
 
         return member
@@ -50,10 +50,11 @@ class System:
         
         if (self.check_duplicate_account(phonenumber)):
             raise ValueError("Duplicate Account")
+        
         customer = Customer(name,surname,phonenumber,email)
         self.__customer_list.append(customer)
         return customer
-    
+
     def delete_customer(self,customer):
         if isinstance(customer,Customer):
             self.__customer_list.remove(customer)
@@ -212,14 +213,14 @@ class System:
         selectitem_list = []
 
         if not customer:
-            raise PermissionError("'User' Not Found")
+            raise ValueError("'User' Not Found")
         for id in item_id:
             type_of_item = self.check_type_from_id(id)
 
             if type_of_item == ItemType.Book:
                 activity_type,series,book_name,author = self.get_data_from_id(type_of_item,id)
 
-                book_info = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type)
+                book_info = self.get_book_info(series,book_name,author,activity_type)
 
                 if not book_info:
                     raise ValueError("Book Not Found, Maybe checking your book id")
@@ -252,7 +253,6 @@ class System:
                 
                 if slot_start_time <= current_time:
                     raise ValueError(f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})")
-                
                 if target_time_slot not in selectitem_list and target_time_slot not in customer.get_selected_list:
                     selectitem_list.append(timeslot)
                 else:
@@ -286,10 +286,12 @@ class System:
         
         if len(booking_items) > 0:
             if not isinstance(customer, Member):
-                raise ValueError("เฉพาะ Member เท่านั้นที่สามารถจองหนังสือ (Booking) ล่วงหน้าได้")
-
+                raise ValueError("เฉพาะ Member เท่านั้นที่สามารถจองหนังสือ (Booking) ล่วงหน้าได้"
+                )
+            # ถ้าเป็น Member แล้ว ค่อยไปเช็คโควต้าต่อ
             if not customer.check_booking_quota(len(booking_items)):
                 raise ValueError("โควต้าจองหนังสือล่วงหน้าเต็มแล้ว!")
+        
         for item in selectitem_list:
             if isinstance(item,BookInfo):
                 customer.select(item,num_days)
@@ -396,17 +398,12 @@ class System:
         book_stock.add_book_info(book_info_obj,activity_type)
         return self.get_all_book
 
-    def add_staff(self,name,surname,phonenumber,email,birth_month):
-        if (not (self.validate_name_and_surname(name,surname) and self.validate_email(email) and self.validate_phonenumber(phonenumber))):
-            raise ValueError()
-        
-        if (self.check_duplicate_account(phonenumber)):
-            raise IndexError()
+    def add_staff(self,customer,birth_month):
+        if isinstance(customer,Staff):
+            raise ValueError("Customer is already a staff")
         
         if not isinstance(birth_month,BirthMonth):
-            raise ValueError()
-        
-        customer = Customer(name,surname,phonenumber,email)
+            raise ValueError("BirthMonth Error")
         
         self.__staff_list.append(Staff(customer,birth_month))
         return "Add Staff Successful"
@@ -463,7 +460,11 @@ class System:
                 customer.add_notify(notification)
                 self.__notification_list.append(notification)
 
-    def return_book(self,book_id : list[str]):
+    def return_book(self,phonenumber,book_id : list[str]):
+        customer = self.get_user_from_phone_number(phonenumber)
+
+        if not customer:
+            raise ValueError("Customer Not Found")
 
         result = []
         for id in book_id:
@@ -480,7 +481,6 @@ class System:
             
             if book.book_status != ItemStatus.InUse and book.book_status != ItemStatus.Confirm:
                 raise ValueError(f"This book is not in use")
-            
             book.change_status(ItemStatus.NotAvailable)
 
             result.append(id)
@@ -553,7 +553,7 @@ class System:
         new_slots = target_area.get_slots_by_ids(slot_ids)
         if len(new_slots) != len(slot_ids):
             raise ValueError("สล็อตเวลาบางอันไม่ถูกต้อง")
-        
+
         current_time = datetime.now().time()
         #current_time = datetime.strptime("13:00", "%H:%M").time()
         for slot in new_slots:
@@ -572,7 +572,7 @@ class System:
         if new_hours > old_hours:
             extra_hours = new_hours - old_hours
             if not customer.check_area_quota(extra_hours):
-                raise ValueError(f"โควต้าเวลาเต็ม! คุณบวกเวลาเพิ่มได้อีกแค่ {customer.get_area_quota() - customer.booking_reservation_time} ชม.")
+                raise f"โควต้าเวลาเต็ม! คุณบวกเวลาเพิ่มได้อีกแค่ {customer.get_area_quota() - customer.booking_reservation_time} ชม."
 
         #สร้างใบอัปเกรด
         try:

@@ -35,12 +35,15 @@ def create_customer(name:str = Query(description="ชื่อจริงลู
 # @app.get("/create_staff",tags=["Main"])
 @mcp.tool
 def register(phonenumber:str,birth_month: BirthMonth):
-    """สมัครจาก Customer ปกติกลายเป็น Member"""
+    """
+    การ สมัครสมาชิก หรือเป็นสมาชิก เกี่ยวกับ สมาชิก มีสมาชิกเริ่มต้นแบบเดียว
+    ให้ข้อมูลเบอร์โทรและวันเกิดเพื่อสมัครสมาชิกเพื่อได้รับแต้ม
+    """
     return {
         "Result register" : bibliohub.register(bibliohub.get_user_from_phone_number(phonenumber),birth_month)
     }
 @mcp.tool
-def create_staff(name:str = Query(description="ชื่อจริงพนักงาน"),surname:str = Query(description="นามสกุลพนักงาน"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์พนักงาน"),email:str = Query(description="อีเมลพนักงาน"),birth_month:BirthMonth = Query(description="เดือนเกิดพนักงาน")):
+def create_staff(birth_month:BirthMonth,phonenumber:str,name:str = None,surname:str = None,email:str = None):
     """
         สร้างบัญชีพนักงานใหม่
         name : ชื่อจริงลูกค้า
@@ -49,9 +52,13 @@ def create_staff(name:str = Query(description="ชื่อจริงพนั
         email : อีเมลลูกค้า
         birth_month : BirthMonth เดือนเกิดพนักงาน
     """
-    return {
-        "Result Staff" : bibliohub.add_staff(name,surname,phonenumber,email,birth_month)
-    }
+    customer = bibliohub.get_user_from_phone_number(phonenumber)
+    if customer:
+        bibliohub.add_staff(customer,birth_month)
+        return "Become a staff"
+    else:
+        bibliohub.add_staff(bibliohub.add_customer(name,surname,phonenumber,email),birth_month)
+        return "Create a customer and become a staff"
 
 # @app.get("/create_promotion",tags=["Main"])
 @mcp.tool
@@ -226,10 +233,8 @@ def select(phonenumber:str,item_id:list[str] = Query(default=["XX-XX-XX"],descri
 # @app.get("/get_all_staff",tags=["Checkout"])
 @mcp.tool
 def get_all_staff():
-    """
-        แสดงผล staff ทั้งหมด
-    """
-    return bibliohub.get_staff_list
+    """แสดงข้อมูลของ staff ทั้งหมด"""
+    return [staff.info() for staff in bibliohub.get_staff_list]
 
 # @app.get("/checkout",tags=["Checkout"])
 @mcp.tool
