@@ -193,10 +193,7 @@ class BookInfo:
                 book.change_status(ItemStatus.InProcess)
                 return book
             
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"หนังสือ {self.name} ไม่มีสถานะ Incoming เหลือให้จองแล้ว"
-        )
+        raise ValueError(f"หนังสือ {self.name} ไม่มีสถานะ Incoming เหลือให้จองแล้ว")
     
 class BookOrder:
     def __init__(self,book_info : BookInfo,nums_date):

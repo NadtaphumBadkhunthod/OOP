@@ -1,5 +1,4 @@
-from enum import Enum
-from datetime import datetime
+from datetime import datetime,timedelta
 
 from core.system import System
 from models.infos import AreaType, BirthMonth, TypeBook, ActivityType
@@ -33,6 +32,7 @@ def mock_data():
     )
     bibliohub.add_area(AreaType.meeting_room,150.0,["Projector", "Whiteboard"], 4)
     bibliohub.add_area(AreaType.quiet_area, 50.0, ["Desk Lamp", "Power Outlet"], 1)
+    bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.May)
     bibliohub.add_staff("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th",BirthMonth.Jan)
     bibliohub.add_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
 
