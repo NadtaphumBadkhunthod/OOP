@@ -220,7 +220,7 @@ class System:
             if type_of_item == ItemType.Book:
                 activity_type,series,book_name,author = self.get_data_from_id(type_of_item,id)
 
-                book_info = self.get_book_info(series,book_name,author,activity_type)
+                book_info = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type)
 
                 if not book_info:
                     raise ValueError("Book Not Found, Maybe checking your book id")

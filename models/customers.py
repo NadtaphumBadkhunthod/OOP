@@ -196,6 +196,7 @@ class Staff(Member):
     def __init__(self, customer : Customer, birth_month):
         super().__init__(customer, birth_month)
         self.__no_staff = f"STF-{Staff.count}"
+        Staff.count += 1
 
     def info(self):
         return {

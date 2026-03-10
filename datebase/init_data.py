@@ -36,7 +36,6 @@ def mock_data():
     bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.May)
     bibliohub.add_staff(bibliohub.add_customer("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th"),BirthMonth.Jan)
     bibliohub.add_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
-    bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.Jun)
 
     # Create_Book
     bibliohub.add_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,1,datetime.today().date())
@@ -50,8 +49,9 @@ def mock_data():
     bibliohub.add_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Purchase,10,datetime.today().date())
 
     # Add Manager
-    manager_obj = Manager("Sax_Manager", "Pongsathorn", "0999999999", "sax_boss@kmitl.ac.th", BirthMonth.Jan, "BR-01")
+    manager_obj = Manager(bibliohub.add_customer("Sax_Manager", "Pongsathorn", "0999999999", "sax_boss@kmitl.ac.th"), BirthMonth.Jan, "BR-01")
     bibliohub.get_staff_list.append(manager_obj) 
+    print(manager_obj.info())
 
     cust = bibliohub.get_user_from_phone_number("0812345678")
     stf = bibliohub.get_staff_by_no_staff("STF-0")
@@ -70,7 +70,7 @@ def mock_data():
                 bibliohub.select("0812345678", [first_area.area__slots[0].slot_id])
                 bibliohub.checkout(cust, stf, PaymentOptions.cash, "NONE")
 
-    gold_member = bibliohub.register("สมชาย", "สายเปย์", "0844444444", "gold@gmail.com", BirthMonth.Aug)
+    gold_member = bibliohub.register(bibliohub.add_customer("สมชาย", "สายเปย์", "0844444444", "gold@gmail.com"), BirthMonth.Aug)
     if isinstance(gold_member, Member):
         for _ in range(35): gold_member.add_point()
 
