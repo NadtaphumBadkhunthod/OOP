@@ -4,6 +4,7 @@ from models.books import Book, BookInfo, BookOrder
 from models.areas import TimeSlot
 from models.infos import ActivityType, LevelMember, BookingBookQuota, CustomerStatus, BirthMonth
 from models.orders import UpgradeArea
+
 class Customer:
     def __init__(self,name:str,surname:str,phonenumber:str,email:str):
         """
@@ -217,8 +218,36 @@ class Staff(Member):
         # Need implement
 
 class Manager(Staff):
-    def __init__(self, customer : Customer, birth_month):
+    def __init__(self, customer : Customer, birth_month, no_branch):
         super().__init__(customer, birth_month)
+        self.__no_branch = no_branch
     
-    def print_report(self):
-        pass
+    def print_report(self, system):
+        if not system.verify_permission(self):
+            raise ValueError("สิทธิ์ไม่เพียงพอ: เฉพาะ Manager เท่านั้นที่เข้าถึงรายงานได้")
+        
+        report = system.generate_utilization_report()
+
+        print(f"BIBLIOHUB UTILIZATION REPORT")
+        print(f"Branch: {self.__no_branch}")
+        print(f"Generated: {report['report_info']['generated_at']}")
+
+        print(f"\n FINANCIAL SUMMARY")
+        print(f" - Rent Income:  {report['financial_report']['rent_revenue']:,} THB")
+        print(f" - Purchase Income: {report['financial_report']['purchase_revenue']:,} THB")
+        print(f" - Area Income:     {report['financial_report']['area_revenue']:,} THB")
+        print(f" TOTAL REVENUE:  {report['financial_report']['total_revenue']:,} THB")
+
+        print(f"\n AREA UTILIZATION")
+        print(f" - Usage Rate: {report['area_utilization']['overall_utilization_percent']}")
+        print(f" - Booked Slots: {report['area_utilization']['total_slots_booked']} / {report['area_utilization']['total_slots_available']}")
+
+        print(f"\n TOP 5 POPULAR BOOKS")
+        for i, (book, count) in enumerate(report['inventory_insights']['top_5_books'].items(), 1):
+            print(f"  {i}. {book} ({count} items)")
+
+        print(f"\n MEMBERSHIP DATA")
+        for level, count in report['membership_data'].items():
+            print(f"  - {level}: {count} users")
+            
+        return report

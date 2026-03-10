@@ -1,0 +1,64 @@
+sequenceDiagram
+    autonumber
+    actor ManagerActor as Manager
+    participant System as BiblioHubSystem
+    participant Trans as Transaction
+    participant Order as Order
+    participant Cust as Customer / Member
+
+    Note over ManagerActor, Cust: เริ่มต้นกระบวนการทำรายงานจากฝั่ง Manager 
+
+    %% 1. Manager เริ่มเรียกใช้ความสามารถของ System
+    ManagerActor->>System: verify_permission(self) 
+    activate System
+    System-->>ManagerActor: return True 
+    deactivate System
+
+    %% 2. Manager สั่งให้ System ประมวลผลรายงาน
+    ManagerActor->>System: generate_utilization_report() 
+    activate System
+    
+
+    loop ทุกรายการใน __transaction_list 
+        System->>Trans: check status == Confirm 
+        activate Trans
+        Trans-->>System: return status_value 
+        deactivate Trans
+
+        alt สถานะได้รับการยืนยัน (Confirm) 
+            System->>Trans: get order 
+            activate Trans
+            Trans-->>System: return order_obj 
+            deactivate Trans    
+
+            %% ดึงข้อมูลรายการสินค้าจาก Order
+            System->>Order: get all items (Rent, Purchase, Area) 
+            activate Order
+            Order-->>System: return all_items_list 
+            deactivate Order
+
+            loop ทุก item ในรายการ 
+                alt เป็นหนังสือ (Book) 
+                    System->>System: สะสมยอด revenue_rent / revenue_purchase 
+                    System->>System: อัปเดตสถิติความนิยม (book_popularity) 
+                else เป็นพื้นที่ (TimeSlot) 
+                    System->>System: สะสมยอด revenue_area (จาก hourly_rate) 
+                    System->>System: นับจำนวนการใช้งานแยกตามประเภทพื้นที่ (area_usage)
+                end
+            end
+        end
+    end
+
+    %% 3. ส่วนการวิเคราะห์ข้อมูลสมาชิก
+    loop ทุก customer ใน __customer_list 
+        System->>Cust: get level_member 
+        activate Cust
+        Cust-->>System: return Level Name (Silver/Gold/Platinum)
+        deactivate Cust
+        System->>System: นับจำนวนสมาชิกในแต่ละระดับ 
+    end
+
+    %% 4. รวบรวมข้อมูลทั้งหมดส่งกลับให้ Manager
+    System->>System: คำนวณ Utilization Rate และจัดอันดับ Top 5 Books 
+    System-->>ManagerActor: return report_dict
+    deactivate System
