@@ -326,7 +326,7 @@ class System:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"หนังสือ {book.name} (ที่กำลังเข้ามา) มีจำนวนไม่พอให้จอง"
                     )
-            elif book_with_same_name.get(book) > book.get_nums_available(): # เปลี่ยนของเดิมเพื่อนจาก if เป็น elif
+            elif book_with_same_name.get(book) > book.get_nums_available():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"หนังสือ {book.name} มีไม่พอโปรดทำรายการใหม่"
@@ -347,14 +347,10 @@ class System:
         
         booking_items = [book for book in selectitem_list if isinstance(book, BookInfo) and book.activity_type == ActivityType.Booking]
         
-        if len(booking_items) > 0:
-            # เช็คว่า customer เป็น instance ของ Member จริงๆ หรือไม่
-            # (อย่าลืม import Member มาไว้ในไฟล์นี้ด้วยนะ)
-            from models.customers import Member 
-            
+        if len(booking_items) > 0:            
             if not isinstance(customer, Member):
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, # ใช้ 403 (Forbidden) จะสื่อสารชัดกว่า
+                    status_code=status.HTTP_403_FORBIDDEN, 
                     detail="เฉพาะ Member เท่านั้นที่สามารถจองหนังสือ (Booking) ล่วงหน้าได้"
                 )
             
