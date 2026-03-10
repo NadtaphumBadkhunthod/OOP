@@ -1,5 +1,4 @@
 from __future__ import annotations
-from fastapi import HTTPException, status
 from models.transactions import Transaction, Notification
 from models.books import Book, BookInfo, BookOrder
 from models.areas import TimeSlot
@@ -225,10 +224,7 @@ class Manager(Staff):
     
     def print_report(self, system):
         if not system.verify_permission(self):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="สิทธิ์ไม่เพียงพอ: เฉพาะ Manager เท่านั้นที่เข้าถึงรายงานได้"
-            )
+            raise ValueError("สิทธิ์ไม่เพียงพอ: เฉพาะ Manager เท่านั้นที่เข้าถึงรายงานได้")
         
         report = system.generate_utilization_report()
 

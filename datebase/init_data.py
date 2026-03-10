@@ -2,10 +2,9 @@ from datetime import datetime,timedelta
 
 from core.system import System
 from models.infos import AreaType, BirthMonth, TypeBook, ActivityType,PaymentOptions
-from models.customers import Staff, Manager, Member # เพิ่ม Manager และ Member
+from models.customers import Manager, Member # เพิ่ม Manager และ Member
 
 def mock_data():
-    Staff.count = 0
     bibliohub = System()
     future_date = datetime.today().date() + timedelta(days=5)
 
@@ -49,8 +48,6 @@ def mock_data():
     # Add Copies
     bibliohub.add_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,datetime.today().date())
     bibliohub.add_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Purchase,10,datetime.today().date())
-
-    Staff.count += 1
 
     # Add Manager
     manager_obj = Manager("Sax_Manager", "Pongsathorn", "0999999999", "sax_boss@kmitl.ac.th", BirthMonth.Jan, "BR-01")
