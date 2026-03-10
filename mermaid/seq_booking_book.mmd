@@ -48,7 +48,11 @@ sequenceDiagram
         Customers-->>Member:return success
         deactivate Member
     end
-    System->>Customers: check_quota(phonenumber)
+    System->>Bookinfo: get_nums_incoming()
+    activate System
+    Bookinfo-->>System: return count
+    deactivate System
+    System->>Customers: check_booking_quota(phonenumber)
     activate System
     alt โควต้าผ่าน (Success Case)
         Customers-->>System: return quota[True]
