@@ -1,9 +1,6 @@
 from __future__ import annotations
-from fastapi import FastAPI, Query, HTTPException, status
-from fastapi.responses import RedirectResponse
 from fastmcp import FastMCP
 from datetime import datetime, date
-import uvicorn
 
 from models.infos import BirthMonth, PaymentOptions, ActivityType, PromotionType
 from models.books import BookInfo, TypeBook
@@ -12,16 +9,10 @@ from datebase.init_data import mock_data
 
 bibliohub = mock_data()
 
-# app = FastAPI()
 mcp = FastMCP()
 
-# @app.get("/")
-def redirect_to_docs():
-    return RedirectResponse(url="/docs")
-
 @mcp.tool
-# @app.get("/create_customer",tags=["Main"])
-def create_customer(name:str = Query(description="ชื่อจริงลูกค้า"),surname:str = Query(description="นามสกุลลูกค้า"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์ลูกค้า"),email:str = Query(description="อีเมลลูกค้า")):
+def create_customer(name:str,surname:str,phonenumber:str,email:str):
     """
         สร้างบัญชีสำหรับลูกค้าใหม่
         name : ชื่อจริงลูกค้า
@@ -74,7 +65,7 @@ def create_promotion(type : PromotionType,promocode : str,discount_rate : float)
 
 # @app.get("/add_or_create_book",tags=["Book"])
 @mcp.tool
-def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,number_of_copies:int,available_date = Query(default=date.today().strftime("%d/%m/%Y"),description="วัน/เดือน/ปี (เช่น 01/02/2026)")):
+def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,number_of_copies:int,available_date : str):
     """
         สร้างหนังสือใหม่
         book_name = ชื่อหนังสือ (Naruto ภาค 10)
@@ -120,8 +111,7 @@ def read_all_areas():
 
 # @app.get("/area/search", tags=["Booking Area"])
 @mcp.tool
-def search_area(phonenumber: str = Query(description="เบอร์โทรศัพท์ลูกค้า (เช่น 812345678)"), 
-                area_id = Query(..., description="เลือกพื้นที่ที่ต้องการจอง")):
+def search_area(phonenumber: str, area_id : str):
 
     """
         ค้นหาพื้นที่เพื่อให้ดูว่ามี ช่วงเวลาไหนว่างบ้าง สำหรับแต่ละพื้นที่
@@ -140,10 +130,10 @@ def search_area(phonenumber: str = Query(description="เบอร์โทร�
 # @app.get("/upgrade_area", tags=["Booking Area"])
 @mcp.tool
 def upgrade_booking_area(
-    phonenumber: str = Query(..., description="เบอร์โทรศัพท์ลูกค้า"),
-    old_area_id: str = Query(..., description="ID ของพื้นที่เดิมที่กำลังนั่งอยู่ (เช่น AREA-QUIET-1)"),
-    new_area_id: str = Query(..., description="ID ของพื้นที่ใหม่ที่ต้องการย้ายไป (เช่น AREA-PRIVATE-2)"),
-    slot_ids: list[str] = Query(default=["XX-XX-XX"], description="ID ของสล็อตเวลาใหม่ที่ต้องการ ขั้นด้วย , (เช่น AREA-PRIVATE-2-1)")
+    phonenumber: str,
+    old_area_id: str,
+    new_area_id: str,
+    slot_ids: list[str]
 ):
     """
     API สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
@@ -222,7 +212,7 @@ def search_book_by_series(series : str):
 
 # @app.get("/select",tags=["Select"])
 @mcp.tool
-def select(phonenumber:str,item_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id"),num_days:int = Query(default=1,description="จำนวนวันที่ต้องการ")):
+def select(phonenumber:str,item_id:list[str],num_days:int):
     """
         เลือกสินค้า ไม่ว่าจะหนังสือ หรือพื้นที่
         หากต้องการสินค้า 3 ชิ้น 
@@ -239,7 +229,7 @@ def get_all_staff():
 
 # @app.get("/checkout",tags=["Checkout"])
 @mcp.tool
-def checkout(phonenumber:str,no_staff:str = Query(description="รหัสพนักงาน"),payment_method:PaymentOptions = Query(description="วิธีการชำระเงิน"),promocode:str = Query(default="xxxxxx",description="รหัสโปรโมชั่น")):
+def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocode:str):
     """
         จ่ายเงิน หลังจากทำรายการอื่นๆ มาแล้ว
     """
@@ -302,7 +292,7 @@ def get_transaction(phonenumber:str):
     } for transaction in customer.get_all_transaction]
 
 @mcp.tool
-def get_manager_report(no_staff: str = Query(..., description="รหัสพนักงานของผู้จัดการ (เช่น STF-0)")):
+def get_manager_report(no_staff: str):
     """
     API สำหรับผู้จัดการ (Manager) เพื่อดึงรายงานสรุปผลการดำเนินงานของระบบ
     ระบบจะทำการตรวจสอบสิทธิ์ว่าพนักงานคนดังกล่าวเป็น Manager หรือไม่ก่อนแสดงผล
@@ -310,10 +300,7 @@ def get_manager_report(no_staff: str = Query(..., description="รหัสพ�
     employee = bibliohub.get_staff_by_no_staff(no_staff)
 
     if not isinstance(employee, Manager):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="สิทธิ์ไม่เพียงพอ: เฉพาะพนักงานระดับ Manager เท่านั้นที่สามารถเข้าถึงรายงานนี้ได้"
-        )
+        raise ValueError("สิทธิ์ไม่เพียงพอ: เฉพาะพนักงานระดับ Manager เท่านั้นที่สามารถเข้าถึงรายงานนี้ได้")
     
     report_data = employee.print_report(bibliohub)
     
@@ -327,7 +314,7 @@ def get_manager_report(no_staff: str = Query(..., description="รหัสพ�
     }
 
 @mcp.tool
-def return_book(phonenumber:str,book_id:list[str] = Query(default=["XX-XX-XX"],description="id ของสินค้าที่ต้องการเลือก ขั้นด้วย , เช่น BK-xx-xx, BK-yy-yy, BK-zz-zz หรือทำทีละ id")):
+def return_book(phonenumber:str,book_id:list[str]):
     """
         สำหรับให้ลูกค้าคืนหนังสือ
     """
@@ -344,7 +331,7 @@ def process_return_book(no_staff : str,book_id : list[str]):
 # @app.get("/system/check_upcoming_deadlines", tags=["Notification Scheduler"])
 @mcp.tool
 def check_upcoming_deadlines(
-    current_datetime: str = Query(None,description="รูปแบบ: dd/mm/yyyy HH:MM")):
+    current_datetime: str):
 
     """
         แสดงผลการแจ้งเตือนทั้งหมด ตามเวลาที่กำหนด  (รูปแบบ: dd/mm/yyyy HH:MM เช่น 10/03/2026 14:56)
