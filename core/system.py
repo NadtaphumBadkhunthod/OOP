@@ -161,21 +161,6 @@ class System:
             if bookstock.name == series:
                 return bookstock
 
-    def get_book_info(self,series : str,book_name : str,author : str,activity_type : ActivityType) -> BookInfo:
-        for bookstock in self.__book_stock:
-            if bookstock.name == series:
-                return bookstock.get_book_info_by_name(book_name,author,activity_type)
-        
-        raise ValueError("Book Series Not Found")
-    
-    def get_book(self,book_series,bookname,author,activity_type,book_id) -> Book | None:
-            for bookstock in self.__book_stock:
-                if bookstock.name == book_series:
-                    for book in self.get_book_info(book_series,bookname,author,activity_type).book_list:
-                        if book.uid == book_id:
-                            return book
-            return None
-
     def check_type_from_id(self,item_id:str) -> str:
         if item_id.startswith("BK"):
             return ItemType.Book
@@ -208,7 +193,7 @@ class System:
         else:
             raise ValueError("Invalid ID format")
         
-    def search_area(self,customer,area_id):
+    def search_area(self,customer : Customer,area_id):
         if not customer.check_eligibility():
                 raise PermissionError("Not come in to my place go away don't comeback")
         
