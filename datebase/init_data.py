@@ -1,5 +1,3 @@
-from __future__ import annotations
-from enum import Enum
 from datetime import datetime,timedelta
 
 from core.system import System
@@ -36,10 +34,10 @@ def mock_data():
     )
     bibliohub.add_area(AreaType.meeting_room,150.0,["Projector", "Whiteboard"], 4)
     bibliohub.add_area(AreaType.quiet_area, 50.0, ["Desk Lamp", "Power Outlet"], 1)
-    area_names = {area.area_id.replace("-", "_").lower(): area.area_id for area in bibliohub.list_area}
-    bibliohub.register("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com", BirthMonth.Jun)
-    bibliohub.add_staff("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th",BirthMonth.Jan)
+    bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.May)
+    bibliohub.add_staff(bibliohub.add_customer("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th"),BirthMonth.Jan)
     bibliohub.add_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
+    bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.Jun)
 
     # Create_Book
     bibliohub.add_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,1,datetime.today().date())
@@ -79,7 +77,4 @@ def mock_data():
     if isinstance(gold_member, Member):
         for _ in range(35): gold_member.add_point()
 
-    
-    AreaOption = Enum('AreaOption', area_names, type=str)
-
-    return bibliohub, AreaOption
+    return bibliohub
