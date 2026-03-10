@@ -2,7 +2,6 @@ from datetime import datetime,timedelta
 
 from core.system import System
 from models.infos import AreaType, BirthMonth, TypeBook, ActivityType
-from models.customers import Customer
 
 def mock_data():
     bibliohub = System()

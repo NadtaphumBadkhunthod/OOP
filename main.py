@@ -34,6 +34,12 @@ def create_customer(name:str = Query(description="ชื่อจริงลู
 
 # @app.get("/create_staff",tags=["Main"])
 @mcp.tool
+def register(phonenumber:str,birth_month: BirthMonth):
+    """สมัครจาก Customer ปกติกลายเป็น Member"""
+    return {
+        "Result register" : bibliohub.register(bibliohub.get_user_from_phone_number(phonenumber),birth_month)
+    }
+@mcp.tool
 def create_staff(name:str = Query(description="ชื่อจริงพนักงาน"),surname:str = Query(description="นามสกุลพนักงาน"),phonenumber:str = Query(description="เบอร์โทรศัพทธ์พนักงาน"),email:str = Query(description="อีเมลพนักงาน"),birth_month:BirthMonth = Query(description="เดือนเกิดพนักงาน")):
     """
         สร้างบัญชีพนักงานใหม่
@@ -175,7 +181,7 @@ def get_all_book_series():
 @mcp.tool
 def search_book_by_series(series : str):
     """
-        แสดงผลหนังสือจาก ซีรีย์
+        หาหนังสือด้วย ซีรีย์ของหนังสือเล่มนั้น (เช่น Naruto มี 10 ภาค ในนี้ก็จะใส่มาเป็น Naruto)
     """
     result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.search_book_by_series(series)
     

@@ -473,7 +473,7 @@ class System:
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
-            book = self.get_book(series,book_name,author,activity_type,id)
+            book = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type).get_book(id)
 
             if not book:
                 raise ValueError(f"Book Not Found | id : {id}")
