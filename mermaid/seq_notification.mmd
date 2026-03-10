@@ -61,12 +61,10 @@ sequenceDiagram
             SYS->>BB: get_booking_book_order()
             activate BB
             BB-->>SYS: List<Book>
-            deactivate BB
             loop each Book
-                SYS->>B: get_pickup_deadline()
-                activate B
-                B-->>SYS: return pickup_deadline
-                deactivate B
+                SYS->>BB: get_pickup_deadline()
+                BB-->>SYS: return pickup_deadline
+                deactivate BB
                 SYS->>SYS: should_notify(current_datetime, booking_item)
                 activate SYS
                 Note right of SYS: if match, append "Booking_Message" to pending_notifies
