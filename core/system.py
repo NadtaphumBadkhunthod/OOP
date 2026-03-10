@@ -49,9 +49,11 @@ class System:
             raise ValueError("Validation Fail")
         
         if (self.check_duplicate_account(phonenumber)):
-            raise IndexError()
-        self.__customer_list.append(Customer(name,surname,phonenumber,email))
-        return "Add customer successful"
+            raise ValueError("Duplicate Account")
+        
+        customer = Customer(name,surname,phonenumber,email)
+        self.__customer_list.append(customer)
+        return customer
 
     def delete_customer(self,customer):
         if isinstance(customer,Customer):
@@ -400,17 +402,14 @@ class System:
         book_stock.add_book_info(book_info_obj,activity_type)
         return self.get_all_book
 
-    def add_staff(self,name,surname,phonenumber,email,birth_month):
-        if (not (self.validate_name_and_surname(name,surname) and self.validate_email(email) and self.validate_phonenumber(phonenumber))):
-            raise ValueError()
-        
-        if (self.check_duplicate_account(phonenumber)):
-            raise IndexError()
+    def add_staff(self,customer,birth_month):
+        if isinstance(customer,Staff):
+            raise ValueError("Customer is already a staff")
         
         if not isinstance(birth_month,BirthMonth):
-            raise ValueError()
+            raise ValueError("BirthMonth Error")
         
-        self.__staff_list.append(Staff(name,surname,phonenumber,email,birth_month))
+        self.__staff_list.append(Staff(customer,birth_month))
         return "Add Staff Successful"
 
     @property

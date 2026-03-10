@@ -12,23 +12,31 @@ mcp = FastMCP("Demo")
 
 @mcp.tool
 def create_customer(name:str ,surname:str ,phonenumber:str,email:str):
-    """สร้าง object ของลูกค้าขึ้นมา"""
+    """สร้างบัญชีให้ลูกค้า Customer ทั่วไป"""
     return {
         "Result Customer" :  bibliohub.add_customer(name,surname,phonenumber,email)
     }
 
+@mcp.tool
 def register(phonenumber:str,birth_month: BirthMonth):
-    """สมัครจาก Customer ปกติกลายเป็น Member"""
+    """
+    การ สมัครสมาชิก หรือเป็นสมาชิก เกี่ยวกับ สมาชิก มีสมาชิกเริ่มต้นแบบเดียว
+    ให้ข้อมูลเบอร์โทรและวันเกิดเพื่อสมัครสมาชิกเพื่อได้รับแต้ม
+    """
     return {
         "Result register" : bibliohub.register(bibliohub.get_user_from_phone_number(phonenumber),birth_month)
     }
 
 @mcp.tool
-def create_staff(name:str,surname:str,phonenumber:str,email:str,birth_month:BirthMonth):
-    """สร้าง object ของ staff ขึ้นมา"""
-    return {
-        "Result Staff" : bibliohub.add_staff(name,surname,phonenumber,email,birth_month)
-    }
+def create_staff(birth_month:BirthMonth,phonenumber:str,name:str = None,surname:str = None,email:str = None):
+    """สร้างบัญชี staff ขึ้นมา"""
+    customer = bibliohub.get_user_from_phone_number(phonenumber)
+    if customer:
+        bibliohub.add_staff(customer,birth_month)
+        return "Become a staff"
+    else:
+        bibliohub.add_staff(bibliohub.add_customer(name,surname,phonenumber,email),birth_month)
+        return "Create a customer and become a staff"
 
 @mcp.tool
 def create_promotion(type : PromotionType,promocode : str,discount_rate : float):
@@ -156,12 +164,12 @@ def search_book_by_series(series : str):
 
 @mcp.tool
 def select(phonenumber:str,item_id:list[str],num_days:int = 0):
-    """เลือกหนังสือหรือพื้นที่ไปเก็บไว้ใน object ของลูกค้า เพื่อนำไปจ่ายเงินต่อไป ลูกค้าปกติจะเช่าหนังสือได้ 4 เท่านั้น และต้องรอคืนถึงจะเช่าต่อได้"""
+    """เลือกหนังสือหรือพื้นที่ไปเก็บไว้ใน object ของลูกค้า เพื่อนำไปจ่ายเงินต่อไป หากต้องการสินค้าเดียวกันหลายชิ้นให้พิมพ์ซ้ำ เช่น [A-B-C,A-B-C,A-B-C] คือต้องการ A-B-C 3 ชิ้น"""
     return bibliohub.select(phonenumber,item_id,num_days)
 
 @mcp.tool
 def get_all_staff():
-    """แสดงข้อมูลของ staff """
+    """แสดงข้อมูลของ staff ทั้งหมด"""
     return [staff.info() for staff in bibliohub.get_staff_list]
 
 @mcp.tool
