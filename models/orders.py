@@ -122,22 +122,22 @@ class Order:
             self.__booking_book.confirm()
 
 class Purchase:
-    def __init__(self,order : list[Book | TimeSlot]):
-        self._order : list[Book | TimeSlot] = order
+    def __init__(self,order : list[Book, TimeSlot]):
+        self._order : list[Book, TimeSlot] = order
 
     @property
-    def get_order(self) -> list[Book | TimeSlot]:
+    def get_order(self) -> list[Book, TimeSlot]:
         return self._order
 
     def calculate_subtotal(self):
-        return sum((item.book_info.price if isinstance(item, Book) else item.price) for item in self._order)   
+        return sum(item.book_info.price for item in self._order if isinstance(item,Book) and item.book_info.activity_type == ActivityType.Rent)   
     
     def confirm(self):
         for item in self._order:
             item.change_status(ItemStatus.Purchased)
 
 class RentBook(Purchase):
-    def __init__(self,order : list[Book | TimeSlot]):
+    def __init__(self,order : list[Book, TimeSlot]):
         super().__init__(order)
         self.__late_penalty_rate = 10
 
@@ -153,10 +153,10 @@ class RentBook(Purchase):
             item.change_status(ItemStatus.Confirm)
 
     def calculate_subtotal(self):
-        return sum((item.book_info.price * (item.end_date - item.start_date).days if isinstance(item, Book) else item.price) for item in self._order)   
+        return sum(item.book_info.price * (item.end_date - item.start_date).days for item in self._order if isinstance(item,Book) and item.book_info.activity_type == ActivityType.Rent)   
     
 class BookingArea(Purchase):
-    def __init__(self, order : list[Book | TimeSlot]):
+    def __init__(self, order : list[Book, TimeSlot]):
         super().__init__(order)
         self.__area : Area = order[0].area if order else None
     

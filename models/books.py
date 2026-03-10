@@ -19,21 +19,12 @@ class Book:
         :param status: สถานะของหนังสือเล่มนั้น
         :type status: ItemStatus
         """
-        self.__customer : Customer | None = None
         self.__book_info = book_info
         self.__book_uid = None
         self.__book_status = status
         self.__start_date : datetime = None 
         self.__end_date : datetime = None
         self.__actual_return_date : datetime = None
-
-    @property
-    def customer(self):
-        return self.__customer
-    
-    @customer.setter
-    def customer(self,new_customer : Customer | None):
-        self.__customer = new_customer
     
     @property
     def book_info(self):

@@ -158,7 +158,7 @@ class Member(Customer):
 
         self.__booking_book_quota = BookingBookQuota.Silver
         self.__status = CustomerStatus.Good
-        self.__book_booked = 0
+        self.__book_booked : int = 0
 
     @property
     def level_member(self):

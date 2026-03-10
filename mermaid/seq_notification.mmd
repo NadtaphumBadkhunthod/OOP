@@ -8,7 +8,6 @@ sequenceDiagram
     participant RB as RentBook
     participant B as Book
     participant BB as BookingBook
-    participant PS as Purchase
 
     SCH->>SYS: check_upcoming_deadlines(current_datetime)
     activate SYS
@@ -64,26 +63,13 @@ sequenceDiagram
             BB-->>SYS: List<Book>
             deactivate BB
             loop each Book
-                SYS->>B: get_booking_dates()
+                SYS->>B: get_pickup_deadline()
                 activate B
-                B-->>SYS: return start_date, end_date
+                B-->>SYS: return pickup_deadline
                 deactivate B
                 SYS->>SYS: should_notify(current_datetime, booking_item)
                 activate SYS
                 Note right of SYS: if match, append "Booking_Message" to pending_notifies
-                deactivate SYS
-            end
-        end
-
-        opt Object is Purchase
-            SYS->>PS: get_purchase_order()
-            activate PS
-            PS-->>SYS: List<Book>
-            deactivate PS
-            loop each Book
-                SYS->>SYS: should_notify(current_datetime, purchase_item)
-                activate SYS
-                Note right of SYS: if match, append "Purchase_Message" to pending_notifies
                 deactivate SYS
             end
         end

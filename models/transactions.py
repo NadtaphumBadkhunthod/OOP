@@ -145,10 +145,7 @@ class Payment:
 
     def calculate_net_amount(self):
         self.__net_amount = 0
-        try : 
-            self.__net_amount += self.calculate_subtotal()
-        except:
-            raise ValueError("Calculate Subtotal")
+        self.__net_amount += self.calculate_subtotal()
         self.__net_amount += self.__upgrade_delta - abs(self.__discount_amount) + self.__base_fee + self.__penalty_fee
         return self.__net_amount
     
@@ -212,8 +209,8 @@ class Transaction:
         booking_list = [order.book_info.search_book_incoming() for order in selected_list if isinstance(order, BookOrder) and order.book_info.activity_type == ActivityType.Booking]
         
         if len(booking_list) > 0:
-            if hasattr(self.__customer, 'book_booked'):
-                self.__customer.book_booked += len(booking_list)
+            if hasattr(customer, 'book_booked'):
+                customer.book_booked += len(booking_list)
             self.__payment.order.booking_book = booking_list
             
         current_time = datetime.now().time()
@@ -245,7 +242,7 @@ class Transaction:
             for upg in upgrade_list:
                 self.add_upgrade_order(upg)
         
-        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0):
+        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0 or len(booking_list) > 0):
             raise ValueError("activity type not found")
         
     

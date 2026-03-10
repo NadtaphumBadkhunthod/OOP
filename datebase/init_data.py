@@ -35,6 +35,7 @@ def mock_data():
     bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.May)
     bibliohub.add_staff(bibliohub.add_customer("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th"),BirthMonth.Jan)
     bibliohub.add_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
+    bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.Jun)
 
     # Create_Book
     bibliohub.add_book("How to learn OOP","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Rent,1,datetime.today().date())
@@ -42,9 +43,6 @@ def mock_data():
     bibliohub.add_book("How to learn OOP 2","How to learn OOP","Sixsax",TypeBook.Education,12,ActivityType.Purchase,2,datetime.today().date())
     bibliohub.add_book("IDK","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,1,datetime.today().date())
     bibliohub.add_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,datetime.today().date())
-
-
-    
 
     # Add Copies
     bibliohub.add_book("IDK 2","IDK","Sixsax",TypeBook.Historical,10,ActivityType.Rent,5,datetime.today().date())
