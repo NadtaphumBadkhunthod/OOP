@@ -27,7 +27,7 @@ class System:
     def list_area(self):
         return self.__area
 
-    def register(self,name,surname,phonenumber,email,birth_month=BirthMonth.Jan) -> Member | str:
+    def register(self,customer : Customer,birth_month : BirthMonth) -> Member | str:
         """
         Registering create member object by using Customer data.
         :param name: name of customer
@@ -36,20 +36,17 @@ class System:
         :param email: email of customer
         """
 
-        if (not (self.validate_name_and_surname(name,surname) and self.validate_email(email) and self.validate_phonenumber(phonenumber))):
-            raise ValueError("Validation Fail")
+        if isinstance(customer,Member):
+            raise ValueError("Customer is already a member")
         
-        if (self.check_duplicate_account(phonenumber)):
-            return ValueError("Account Duplicate")
-        
-        member = Member(name,surname,phonenumber,email,birth_month)
+        member = Member(customer,birth_month)
         self.__customer_list.append(member)
 
         return member
     
     def add_customer(self,name,surname,phonenumber,email):
         if (not (self.validate_name_and_surname(name,surname) and self.validate_email(email) and self.validate_phonenumber(phonenumber))):
-            raise ValueError()
+            raise ValueError("Validation Fail")
         
         if (self.check_duplicate_account(phonenumber)):
             raise IndexError()
@@ -159,10 +156,10 @@ class System:
     def get_all_book(self):
         return self.__book_stock
     
-    def search_book_by_series(self,series):
+    def get_book_stock(self,series):
         for bookstock in self.__book_stock:
             if bookstock.name == series:
-                return bookstock.get_book_list(ActivityType.All)
+                return bookstock
 
     def get_book_info(self,series : str,book_name : str,author : str,activity_type : ActivityType) -> BookInfo:
         for bookstock in self.__book_stock:
@@ -345,7 +342,7 @@ class System:
             raise ValueError("No Order")
 
         transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
-        transaction.order = customer.get_selected_list
+        transaction.make_order(customer)
 
         transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}") #need implement : เพิ่มรูปแบบของ audit log
 
@@ -497,7 +494,7 @@ class System:
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
-            book = self.get_book(series,book_name,author,activity_type,id)
+            book = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type).get_book(id)
 
             if not book:
                 raise ValueError(f"Book Not Found | id : {id}")
@@ -510,9 +507,7 @@ class System:
             
             self.__book_returned_list.append(book)
 
-        customer.book_rented -= len(result)
-        if customer.book_rented < len(result):
-            customer.book_rented = 0
+        book.customer.book_rented -= len(result)
 
         return {
             "Book Returned" : result
@@ -531,7 +526,7 @@ class System:
             
             activity_type,series,book_name,author = self.get_data_from_id(type_item,id)
 
-            book = self.get_book(series,book_name,author,activity_type,id)
+            book = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type).get_book(id)
 
             if not book:
                 raise ValueError(f"Book Not Found | id : {id}")
@@ -540,7 +535,7 @@ class System:
                 raise ValueError("Book not return yet")
             
             result.append(id)
-            
+            book.customer = None
             book.change_status(ItemStatus.Available)
 
         return {
