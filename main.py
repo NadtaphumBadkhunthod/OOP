@@ -190,7 +190,7 @@ def search_book_by_series(series : str):
     """
         หาหนังสือด้วย ซีรีย์ของหนังสือเล่มนั้น (เช่น Naruto มี 10 ภาค ในนี้ก็จะใส่มาเป็น Naruto)
     """
-    result : tuple[list[BookInfo],list[BookInfo]] = bibliohub.search_book_by_series(series)
+    result : tuple[list[BookInfo],list[BookInfo],list[BookInfo]] = bibliohub.get_book_stock(series).get_book_list(ActivityType.All)
     
     if not result:
         return "Series Not Found"

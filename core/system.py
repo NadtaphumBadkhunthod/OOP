@@ -388,7 +388,7 @@ class System:
             return "Create BookStock,BookInfo and Add Copy Successful"
 
 
-        for book_info_obj in stock.get_book_list(activity_type):
+        for book_info_obj in book_stock.get_book_list(activity_type):
             if book_info_obj.name == book_name:
                 book_info_obj.add_copies(number_of_copies)
                 return "Add Copy Successful"
