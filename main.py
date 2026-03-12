@@ -221,6 +221,11 @@ def select(phonenumber:str,item_id:list[str],num_days:int):
     """
     return bibliohub.select(phonenumber,item_id,num_days)
 
+@mcp.tool
+def unselect(phonenumber:str,item_id:list[str]):
+    """ยกเลิกการเลือกสินค้า"""
+    return bibliohub.unselect(phonenumber,item_id)
+
 # @app.get("/get_all_staff",tags=["Checkout"])
 @mcp.tool
 def get_all_staff():
@@ -234,6 +239,9 @@ def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocod
         จ่ายเงิน หลังจากทำรายการอื่นๆ มาแล้ว
     """
     transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method,promocode)
+
+    if isinstance(transaction,list):
+        return transaction
 
     return {
         "Transaction" : {
@@ -314,11 +322,11 @@ def get_manager_report(no_staff: str):
     }
 
 @mcp.tool
-def return_book(phonenumber:str,book_id:list[str]):
+def return_book(book_id:list[str]):
     """
         สำหรับให้ลูกค้าคืนหนังสือ
     """
-    return bibliohub.return_book(phonenumber,book_id)
+    return bibliohub.return_book(book_id)
 
 # @app.get("/process_book_return",tags=["For Staff"])
 @mcp.tool

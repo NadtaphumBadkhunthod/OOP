@@ -25,6 +25,7 @@ class Book:
         self.__start_date : datetime = None 
         self.__end_date : datetime = None
         self.__actual_return_date : datetime = None
+        self.__customer : Customer = None
     
     @property
     def book_info(self):
@@ -53,6 +54,14 @@ class Book:
     @property
     def start_date(self):
         return self.__start_date
+    
+    @property
+    def customer(self):
+        return self.__customer
+    
+    @customer.setter
+    def customer(self,new_customer):
+        self.__customer = new_customer
 
     @property
     def end_date(self):

@@ -25,30 +25,33 @@ class Promotion:
         return self.__type
         
     def is_eligible(self,customer,promocode):
+        from models.customers import Customer
         if isinstance(customer,Customer):
             if self.type == PromotionType.BirthMonth:
+                from models.customers import Member
                 if not isinstance(customer,Member):
                     raise ValueError("This Promotion Need to be used by Member only")
             
-            return customer not in self.__used_user and promocode == self.__promo_code
+            return (customer not in self.__used_user and promocode == self.__promo_code)
         
     def apply_discount(self,price,customer,promocode):
         if self.__status == ItemStatus.Available:
             if promocode == self.__promo_code:
+                from models.customers import Customer
                 if isinstance(customer,Customer):
                     if self.is_eligible(customer,promocode):
                         self.__used_user.append(customer)
-                        return self.calculate_discount(customer,price)
+                        return self.calculate_discount(price)
         raise ValueError("Promotion is not Available")
 
     def change_stauts(self,status : ItemStatus):
         self.__status = status
     
-    def calculate_discount(self,customer,price):
-        if customer in self.__used_user:
-            return (price * self.__discount_rate / 100)
-            
+    def calculate_discount(self,price):
+        return (price * self.__discount_rate / 100)
+    
     def payment_unsuccess(self,customer):
+        from models.customers import Customer
         if isinstance(customer,Customer):
             self.__used_user.remove(customer)
 
@@ -200,8 +203,8 @@ class Transaction:
     def order(self):
         return self.__payment.order
     
-    def make_order(self,customer : Customer):
-        selected_list : list[BookOrder | TimeSlot] = customer.get_selected_list
+    def make_order(self,customer : "Customer"):
+        selected_list : list[BookOrder, TimeSlot] = customer.get_selected_list
         rent_list = [order.book_info.search_book_available(customer).calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
         purchase_list = [order.book_info.search_book_available(customer) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
         area_list = {}
