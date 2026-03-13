@@ -130,7 +130,7 @@ class Purchase:
         return self._order
 
     def calculate_subtotal(self):
-        return sum(item.book_info.price for item in self._order if isinstance(item,Book) and item.book_info.activity_type == ActivityType.Purchase)   
+        return sum(item.book_info.price for item in self._order if isinstance(item,Book))   
     
     def confirm(self):
         for item in self._order:

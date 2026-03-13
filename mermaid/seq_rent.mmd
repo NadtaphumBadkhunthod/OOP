@@ -7,20 +7,6 @@ sequenceDiagram
     participant BI as BookInfo
     participant BK as Book
 
-    %% Search Book by Series
-
-    Note over Customer: search bookinfo by series
-    Customer ->>+ SYS: search_book_by_series(book_series)
-    loop bookstock in bookstock_list
-        SYS ->>+ BS: get_book_series()
-        BS -->>- SYS: return book_series [string]
-
-        opt series matches
-            SYS ->>+ BS: get_book_list()
-            BS -->>- SYS: return book_forsale_list, book_rent_list [list]
-        end
-    end
-
     SYS -->>- Customer: return book_forsale_list, book_rent_list [list]
 
     %% Select Book

@@ -248,8 +248,8 @@ class System:
                 if not target_time_slot or target_time_slot.is_available != ItemStatus.Available:
                     raise ValueError(f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)")
                 
-                current_time = datetime.now().time()
-                # current_time = datetime.strptime("08:00", "%H:%M").time()
+                # current_time = datetime.now().time()
+                current_time = datetime.strptime("08:00", "%H:%M").time()
                 slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
                 
                 if slot_start_time <= current_time:

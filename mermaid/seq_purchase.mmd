@@ -7,39 +7,6 @@ sequenceDiagram
     participant BI as BookInfo
     participant BK as Book
 
-    Note over US, SYS: --- PURCHASE SEARCH PHASE ---
-    US->>SYS: search_book(phone, series) 
-    activate SYS
-    
-    SYS->>SYS: get_customer_by_phone(phone)
-    
-    loop check_eligibility in Customer
-        SYS ->> CS: check_eligibility()
-        activate CS
-        CS -->> SYS: return bool
-        deactivate CS
-    end
-    loop search_book
-        SYS ->> SYS: search_book(book_series)
-        SYS ->> BS: search_book_available(name, activity_type = "Purchase")
-        activate BS
-        BS ->> BI: search_book_available()
-        activate BI
-        loop check_available
-            BI ->> BK: check_available()
-            activate BK
-            BK -->> BI: return status
-            deactivate BK
-        end
-        BI -->> BS: return available_status
-        deactivate BI
-        BS -->> SYS: return available_book
-        deactivate BS
-        SYS -->> US: return bookstock[object]
-    end
-    deactivate SYS
-
-
     Note over US, SYS: --- SELECT BOOK PHASE ---
     loop Select Book
         US ->> SYS: select_book(phone, book_name, activity_type = "Purchase")

@@ -143,6 +143,8 @@ class Payment:
             subtotal += self.__order.purchase_book.calculate_subtotal()
         if len(self.__order.booking_area) > 0:
             subtotal += sum([bookingarea.calculate_subtotal() for bookingarea in self.__order.booking_area])
+        if self.__order.booking_book:
+            subtotal += self.__order.booking_book.calculate_subtotal()
 
         return subtotal
 

@@ -6,38 +6,7 @@ sequenceDiagram
     participant Bookstock as Bookstock 
     participant Bookinfo as Bookinfo 
     participant Book as Book
-
-
-    Member->>System: search_book_by_series(phonenumber,book_series)
-    activate Member
-    loop check_eligibility ใน Customers
-        System->>Customers: check_eligibility(phonenumber)
-        activate System
-        Customers-->>System: return ประวัติดี
-        deactivate System
-    end
-    loop ค้นหา Book ใน Bookstock
-        System->>Bookstock: search_book(phonenumber,book_series)
-        activate System
-        loop  Book ใน Bookstock ว่างให้จองหรือไม่
-            Bookstock->>Bookinfo: check is_available()
-            activate Bookstock
-            loop เช็คสถานะของbook
-                
-                Bookinfo->>Book: check_available()
-                activate Bookinfo
-                Book-->>Bookinfo: return status
-                deactivate Bookinfo
-                
-            end
-            Bookinfo-->>Bookstock:return available_status
-            deactivate Bookstock
-        end
-        Bookstock-->>System: return available_book
-        deactivate System
-        System-->>Member: return bookstock[object]
-        deactivate Member
-    end
+    
     Member->>System: select_book(phonenumber,book_id,reservation_date,pickup_deadline)
     activate Member
     System->>System: get_user_from_phone_number(phonenumber)
