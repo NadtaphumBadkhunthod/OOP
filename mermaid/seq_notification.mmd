@@ -1,7 +1,7 @@
 sequenceDiagram
     autonumber
-    actor SCH as Scheduler
-    participant SYS as BiblioHubSystem
+    actor S as BiblioHubSystem
+    participant SYS as System
     participant TS as Transaction
     participant BA as BookingArea
     participant TM as TimeSlot
@@ -9,11 +9,10 @@ sequenceDiagram
     participant B as Book
     participant BB as BookingBook
 
-    SCH->>SYS: check_upcoming_deadlines(current_datetime)
+    S->>SYS: check_upcoming_deadlines(current_datetime)
     activate SYS
 
     SYS->>SYS: process_notifications(current_datetime)
-    activate SYS
 
     loop each Transaction in __transaction_list
         SYS->>TS: get_customer()
@@ -28,15 +27,15 @@ sequenceDiagram
             activate BA
             BA-->>SYS: List<TimeSlot>
             deactivate BA
+
             loop each Slot
                 SYS->>TM: get_slot_times()
                 activate TM
                 TM-->>SYS: return start_time, end_time
                 deactivate TM
-                SYS->>SYS: should_notify(current_datetime, slot_item)
-                activate SYS
+
+                SYS->>SYS: should_notify(current_time, item : TimeSlot, customer_name)
                 Note right of SYS: if match, append "Area_Message" to pending_notifies
-                deactivate SYS
             end
         end
 
@@ -45,45 +44,37 @@ sequenceDiagram
             activate RB
             RB-->>SYS: List<Book>
             deactivate RB
+
             loop each Book
                 SYS->>B: get_rental_dates()
                 activate B
                 B-->>SYS: return start_date, end_date
                 deactivate B
-                SYS->>SYS: should_notify(current_datetime, rent_item)
-                activate SYS
+
+                SYS->>SYS: should_notify(current_time, item : Book, customer_name)
                 Note right of SYS: if match, append "Rent_Message" to pending_notifies
-                deactivate SYS
             end
         end
 
         opt Object is BookingBook
             SYS->>BB: get_booking_book_order()
             activate BB
-            BB-->>SYS: List<Book>
+            BB-->>SYS: return booking_book_obj
+
+            SYS->>BB: get_pickup_deadline()
+            BB-->>SYS: return pickup_deadline
             deactivate BB
-            loop each Book
-                SYS->>B: get_pickup_deadline()
-                activate B
-                B-->>SYS: return pickup_deadline
-                deactivate B
-                SYS->>SYS: should_notify(current_datetime, booking_item)
-                activate SYS
-                Note right of SYS: if match, append "Booking_Message" to pending_notifies
-                deactivate SYS
-            end
+
+            SYS->>SYS: should_notify(current_time, item : BookingBook, customer_name)
+            Note right of SYS: if match, append "Booking_Message" to pending_notifies
         end
 
         loop each message in pending_notifies
             SYS->>SYS: notify_user(customer_obj, message)
-            activate SYS
             Note right of SYS: Save Notification to List
-            deactivate SYS
         end
 
     end
 
-    deactivate SYS
-
-    SYS-->>SCH: status("Notification checked")
+    SYS-->>S: status("Notification checked")
     deactivate SYS
