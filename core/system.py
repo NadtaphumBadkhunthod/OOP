@@ -317,60 +317,6 @@ class System:
         return {
             "Customer Selected List" : respond
         }
-
-    def unselect(self,phonenumber : str, item_id : list[str]):
-        customer = self.get_user_from_phone_number(phonenumber)
-        unselectitem_list = []
-
-        if not customer:
-            raise ValueError("'User' Not Found")
-        for id in item_id:
-            type_of_item = self.check_type_from_id(id)
-
-            if type_of_item == ItemType.Book:
-                activity_type,series,book_name,author = self.get_data_from_id(type_of_item,id)
-
-                book_info = self.get_book_stock(series).get_book_info_by_name(book_name,author,activity_type)
-
-                if not book_info:
-                    raise ValueError("Book Not Found, Maybe checking your book id")
-                
-                unselectitem_list.append(book_info)
-            elif type_of_item == ItemType.Area:
-                area_id,time_slot_id = self.get_data_from_id(type_of_item,id)
-
-                target_area = None
-                for area in self.list_area:
-                    if area.area_id == area_id:
-                        target_area = area
-                        break
-
-                if not target_area:
-                    raise ValueError("ไม่พบพื้นที่")
-                
-                target_time_slot = None
-                for timeslot in area.list_timeslot:
-                    if timeslot.slot_id == time_slot_id:
-                        target_time_slot = timeslot
-                        break
-                        
-                if not target_time_slot or target_time_slot.is_available != ItemStatus.Available:
-                    raise ValueError(f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)")
-                
-                current_time = datetime.now().time()
-                # current_time = datetime.strptime("08:00", "%H:%M").time()
-                slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
-                
-                if slot_start_time <= current_time:
-                    raise ValueError(f"ไม่สามารถจองสล็อตที่เวลาผ่านไปแล้วได้ ({target_time_slot.start_time}-{target_time_slot.end_time})")
-                if target_time_slot not in unselectitem_list and target_time_slot not in customer.get_selected_list:
-                    unselectitem_list.append(timeslot)
-                else:
-                    raise ValueError(f"{target_time_slot} - Already Selected")
-
-        for unselect in unselectitem_list:
-            customer.unselect(unselect)
-
      
     def checkout(self,customer:Customer,staff:Staff,payment_method : PaymentOptions, promocode):
         if not isinstance(customer,Customer):
@@ -605,8 +551,8 @@ class System:
         if len(new_slots) != len(slot_ids):
             raise ValueError("สล็อตเวลาบางอันไม่ถูกต้อง")
 
-        current_time = datetime.now().time()
-        #current_time = datetime.strptime("13:00", "%H:%M").time()
+        # current_time = datetime.now().time()
+        current_time = datetime.strptime("08:00", "%H:%M").time()
         for slot in new_slots:
             if slot.is_available != ItemStatus.Available:
                 raise ValueError(f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")

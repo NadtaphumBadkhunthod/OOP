@@ -217,7 +217,8 @@ class UpgradeArea(Purchase):
         old_rate = self.__old_booking.area.hourly_rate
         new_rate = self.__new_slots[0].area.hourly_rate
         
-        current_time = datetime.now().time()
+        # current_time = datetime.now().time()
+        current_time = datetime.strptime("08:00", "%H:%M").time()
         old_remaining_hours = 0
         for slot in self.__old_booking.get_order:
             slot_end_time = datetime.strptime(slot.end_time, "%H:%M").time()
