@@ -40,28 +40,28 @@ direction TB
     }
 
     class BookInfo {
-        -String __name
-        -BookStock __book_stock
-        -String __author
-        -TypeBook __category
-        -Float __price
-        -ActivityType __activity_type
-        -List~Book~ __book
-        -Date __available_date
-        -String __id
+        -String name
+        -BookStock book_stock
+        -String author
+        -TypeBook category
+        -Float price
+        -ActivityType activity_type
+        -List~Book~ book
+        -Date available_date
+        -String id
         +add_copies(copies: int)
         +search_book_available()
         +search_book_incoming()
     }
 
     class Book {
-        -BookInfo __book_info
-        -String __book_uid
-        -Int __borrowed_count
-        -BookStatus __book_status
-        -Date __start_date
-        -Date __end_date
-        -Date __actual_return_date
+        -BookInfo book_info
+        -String book_uid
+        -Int borrowed_count
+        -BookStatus book_status
+        -Date start_date
+        -Date end_date
+        -Date actual_return_date
         +calculate_end_date(how_many_days: int)
         +check_available()
         +check_incoming()
@@ -70,10 +70,10 @@ direction TB
     }
 
     class BookStock {
-        -String __name
-        -List~BookInfo~ __forsale_book_list
-        -List~BookInfo~ __rent_book_list
-        -List~BookInfo~ __booking_book_list
+        -String name
+        -List~BookInfo~ forsale_book_list
+        -List~BookInfo~ rent_book_list
+        -List~BookInfo~ booking_book_list
         +get_book_list(activity_type: ActivityType)
         +add_book_info(book_info: BookInfo, activity_type: ActivityType)
         +remove_book(book)
