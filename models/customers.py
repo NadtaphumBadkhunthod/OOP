@@ -26,7 +26,16 @@ class Customer:
         self.__rental_quota = 4
         self.__book_rented = 0
         self.__strike = 0
+        self.__penalty_fee = 0
         self.__selected_list : list[Book | TimeSlot] = []
+
+    @property
+    def penalty_fee(self):
+        return self.__penalty_fee
+    
+    @penalty_fee.setter
+    def penalty_fee(self,new_fee):
+        self.__penalty_fee = new_fee
 
     @property
     def get_all_transaction(self) -> list[Transaction]:
@@ -78,10 +87,21 @@ class Customer:
     
     @book_rented.setter
     def book_rented(self,nums_rent):
-        if self.__book_rented < nums_rent:
+        if nums_rent < 0:
             self.__book_rented = 0
         else :
-            self.__book_rented -= nums_rent 
+            self.__book_rented = nums_rent 
+
+    @property
+    def strike(self):
+        return self.__strike
+    
+    @strike.setter
+    def strike(self,new_strike):
+        if new_strike < 0:
+            self.__strike = 0
+        else:
+            self.__strike = new_strike
 
     def check_eligibility(self):
         return self.__strike < 3
@@ -124,6 +144,7 @@ class Customer:
     def add_transaction(self,transaction):
         if isinstance(transaction,Transaction):
             self.__transaction.append(transaction)
+            self.__penalty_fee = 0
             self.__selected_list = []
 
     @property

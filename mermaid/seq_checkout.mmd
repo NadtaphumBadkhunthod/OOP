@@ -102,7 +102,7 @@ sequenceDiagram
         opt is Member
             SYS ->> CS: add_point()
             activate CS
-            MB -->> SYS: return add_point successful
+            CS -->> SYS: return add_point successful
             deactivate CS
         end
         SYS -->> CS: return checkout successful

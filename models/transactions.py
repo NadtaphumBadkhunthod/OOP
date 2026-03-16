@@ -75,7 +75,6 @@ class Payment:
         self.__base_fee = 10 # เท่าไหร่อ่ะ need implement
         self.__upgrade_delta = 0
         self.__discount_amount = 0
-        self.__penalty_fee = 0
         self.__net_amount = 0
 
     @property
@@ -149,6 +148,7 @@ class Payment:
         return subtotal
 
     def calculate_net_amount(self):
+        self.__penalty_fee = self.__customer.penalty_fee
         self.__net_amount = 0
         self.__net_amount += self.calculate_subtotal()
         self.__net_amount += self.__upgrade_delta - abs(self.__discount_amount) + self.__base_fee + self.__penalty_fee
@@ -159,9 +159,6 @@ class Payment:
 
         if status == PaymentStatus.Paid:
             self.__order.confirm()
-
-    def add_penalty_fee(self,penalty_fee):
-        self.__penalty_fee += penalty_fee
 
 class Transaction:
     def __init__(self,customer: "Customer",staff: "Staff",payment_method : PaymentOptions,start_date_time : datetime = datetime.now(), end_date_time : datetime = datetime.now()):
@@ -205,7 +202,7 @@ class Transaction:
     def order(self):
         return self.__payment.order
     
-    def make_order(self,customer : "Customer"):
+    def make_order(self,customer : "Customer",current_time):
         selected_list : list[BookOrder, TimeSlot] = customer.get_selected_list
         rent_list = [order.book_info.search_book_available(customer).calculate_end_date(order.nums_date) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Rent]
         purchase_list = [order.book_info.search_book_available(customer) for order in selected_list if isinstance(order,BookOrder) and order.book_info.activity_type == ActivityType.Purchase]
@@ -217,9 +214,6 @@ class Transaction:
             if hasattr(customer, 'book_booked'):
                 customer.book_booked += len(booking_list)
             self.__payment.order.booking_book = booking_list
-
-        # current_time = datetime.now().time()
-        current_time = datetime.strptime("08:00", "%H:%M").time()
         
         for areatype in AreaType:
             area_in_type_list = []
@@ -248,8 +242,8 @@ class Transaction:
             for upg in upgrade_list:
                 self.add_upgrade_order(upg)
         
-        if not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0 or len(booking_list) > 0):
-            raise ValueError("activity type not found")
+        if (not (len(rent_list) > 0 or len(purchase_list) > 0 or len(area_list) > 0 or len(upgrade_list) > 0 or len(booking_list) > 0)) and customer.penalty_fee == 0:
+            raise ValueError("No Order")
         
     
     def get_current_booking_area(self, old_area_id: str) -> BookingArea:
@@ -281,16 +275,15 @@ class Transaction:
 
     def add_audit_log(self,log):
         self.__audit_logs_list.append(log)
-
-    def sync_payment_with_activity(self,rentbook : RentBook):
-        return True
     
 class Notification:
-    count = 0
-    def __init__(self,customer,message):
-        self.__customer = customer
+    def __init__(self,customer : Customer,message):
+        self.__customer : Customer = customer
         self.__message = message
-        self.__uid = f"NT-{customer.name}-{Notification.count}"
+        self.__uid = f"NT-{self.__customer.name}-{uuid.uuid4().hex[:8].upper()}"
+
+    def info(self):
+        return f"{self.__uid} : {self.__message}"
 
 class PaymentMethod(ABC):
     @property

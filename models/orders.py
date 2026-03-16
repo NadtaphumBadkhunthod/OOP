@@ -186,14 +186,14 @@ class BookingArea(Purchase):
             item.change_status(ItemStatus.NotAvailable)
 
 class UpgradeArea(Purchase):
-    def __init__(self, old_booking: BookingArea, new_slots: list[TimeSlot]):
+    def __init__(self, old_booking: BookingArea, new_slots: list[TimeSlot],current_time):
         super().__init__(new_slots)
         self.__old_booking = old_booking  
         self.__new_slots = new_slots
         self.__upgrade_delta = 0.0
         
         self.validate_upgrade_rules()
-        self.calculate_delta()
+        self.calculate_delta(current_time)
 
     @property
     def old_booking(self):
@@ -213,12 +213,10 @@ class UpgradeArea(Purchase):
         if new_rate <= old_rate:
             raise ValueError(f"ไม่สามารถอัปเกรดได้ (ราคาพื้นที่ใหม่ {new_rate} <= พื้นที่เดิม {old_rate})")
 
-    def calculate_delta(self):
+    def calculate_delta(self,current_time):
         old_rate = self.__old_booking.area.hourly_rate
         new_rate = self.__new_slots[0].area.hourly_rate
         
-        # current_time = datetime.now().time()
-        current_time = datetime.strptime("08:00", "%H:%M").time()
         old_remaining_hours = 0
         for slot in self.__old_booking.get_order:
             slot_end_time = datetime.strptime(slot.end_time, "%H:%M").time()

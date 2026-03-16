@@ -5,7 +5,7 @@ from datetime import datetime
 from models.infos import BirthMonth, PaymentOptions, ActivityType, PromotionType
 from models.books import BookInfo, TypeBook
 from models.customers import Manager
-from datebase.init_data import mock_data
+from database.init_data import mock_data
 
 bibliohub = mock_data()
 
@@ -24,7 +24,6 @@ def create_customer(name:str,surname:str,phonenumber:str,email:str):
         "Result Customer" :  bibliohub.add_customer(name,surname,phonenumber,email)
     }
 
-# @app.get("/create_staff",tags=["Main"])
 @mcp.tool
 def register(phonenumber:str,birth_month: BirthMonth):
     """
@@ -34,6 +33,7 @@ def register(phonenumber:str,birth_month: BirthMonth):
     return {
         "Result register" : bibliohub.register(bibliohub.get_user_from_phone_number(phonenumber),birth_month)
     }
+
 @mcp.tool
 def create_staff(birth_month:BirthMonth,phonenumber:str,name:str = None,surname:str = None,email:str = None):
     """
@@ -52,7 +52,6 @@ def create_staff(birth_month:BirthMonth,phonenumber:str,name:str = None,surname:
         bibliohub.add_staff(bibliohub.add_customer(name,surname,phonenumber,email),birth_month)
         return "Create a customer and become a staff"
 
-# @app.get("/create_promotion",tags=["Main"])
 @mcp.tool
 def create_promotion(type : PromotionType,promocode : str,discount_rate : float):
     """
@@ -63,7 +62,6 @@ def create_promotion(type : PromotionType,promocode : str,discount_rate : float)
     """
     return  bibliohub.add_promotion(type,promocode,discount_rate)
 
-# @app.get("/add_or_create_book",tags=["Book"])
 @mcp.tool
 def create_book(book_name:str,series:str,author:str,category:TypeBook,price:float,activity_type:ActivityType,number_of_copies:int,available_date : str):
     """
@@ -79,7 +77,6 @@ def create_book(book_name:str,series:str,author:str,category:TypeBook,price:floa
     """
     return bibliohub.add_book(book_name,series,author,category,price,activity_type,number_of_copies,datetime.strptime(available_date, "%d/%m/%Y").date())
 
-# @app.get("/all_area", tags=["Booking Area"])
 @mcp.tool
 def read_all_areas():
     """
@@ -109,7 +106,6 @@ def read_all_areas():
         "areas_catalog": all_areas
     }
 
-# @app.get("/area/search", tags=["Booking Area"])
 @mcp.tool
 def search_area(phonenumber: str, area_id : str):
 
@@ -127,20 +123,23 @@ def search_area(phonenumber: str, area_id : str):
     except Exception as e:
         return {"error": str(e)}
 
-# @app.get("/upgrade_area", tags=["Booking Area"])
 @mcp.tool
 def upgrade_booking_area(
     phonenumber: str,
     old_area_id: str,
     new_area_id: str,
-    slot_ids: list[str]
+    new_slot_ids: list[str],
+    current_time: str
 ):
     """
     API สำหรับส่งคำร้องขออัปเกรดที่นั่ง 
     ระบบจะทำการเช็คราคาและโควต้า หากผ่านจะนำใบเสนอราคาส่วนต่างใส่ตะกร้าให้โดยอัตโนมัติ
     จากนั้นให้ลูกค้าไปเรียก API /checkout ต่อไป
+    current_time รูปแบบคือ hh:mm เช่น 08:00 ปกติจะเป็นเวลาปัจจุบันในประเทศไทย
     """
-    return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, slot_ids)
+
+    current_time = datetime.strptime(current_time, "%H:%M").time()
+    return bibliohub.upgrade_booking_area(phonenumber, old_area_id, new_area_id, new_slot_ids, current_time)
 
 def format_book_info(book : BookInfo):
     is_booking = book.activity_type.value == "Booking"
@@ -154,7 +153,6 @@ def format_book_info(book : BookInfo):
         "Book Incoming" : available_nums
     }
 
-# @app.get("/get_all_book_series",tags=["Book"])
 @mcp.tool
 def get_all_book_series():
     """
@@ -175,15 +173,14 @@ def get_all_book_series():
         "All Book Series" : respond
     }
 
-# @app.get("/search_book_by_series",tags=["Book"])
 @mcp.tool
 def search_book_by_series(series : str):
     """
         หาหนังสือด้วย ซีรีย์ของหนังสือเล่มนั้น (เช่น Naruto มี 10 ภาค ในนี้ก็จะใส่มาเป็น Naruto)
     """
-    result : tuple[list[BookInfo],list[BookInfo],list[BookInfo]] = bibliohub.get_book_stock(series).get_book_list(ActivityType.All)
-    
-    if not result:
+    try:
+        result : tuple[list[BookInfo],list[BookInfo],list[BookInfo]] = bibliohub.get_book_stock(series).get_book_list(ActivityType.All)
+    except:
         return "Series Not Found"
     
     
@@ -210,35 +207,34 @@ def search_book_by_series(series : str):
         } for book in book_for_booking]
     }
 
-# @app.get("/select",tags=["Select"])
 @mcp.tool
-def select(phonenumber:str,item_id:list[str],num_days:int):
+def select(phonenumber:str,item_id:list[str],current_time:str,num_days:int):
     """
         เลือกสินค้า ไม่ว่าจะหนังสือ หรือพื้นที่
         หากต้องการสินค้า 3 ชิ้น 
         ก็จะเป็น
         [A-B-C,A-B-C,A-B-C] รหัสที่ต้องการตามจำนวนชิ้น
+        num_days ใช้เฉพาะเมื่อมีรายการเช่าในรายการด้วย
+        current_time รูปแบบคือ hh:mm เช่น 08:00 ปกติจะเป็นเวลาปัจจุบันในประเทศไทย
     """
-    return bibliohub.select(phonenumber,item_id,num_days)
 
-@mcp.tool
-def unselect(phonenumber:str,item_id:list[str]):
-    """ยกเลิกการเลือกสินค้า"""
-    return bibliohub.unselect(phonenumber,item_id)
 
-# @app.get("/get_all_staff",tags=["Checkout"])
+    current_time = datetime.strptime(current_time, "%H:%M").time()
+    return bibliohub.select(phonenumber,item_id,num_days,current_time)
+
 @mcp.tool
 def get_all_staff():
     """แสดงข้อมูลของ staff ทั้งหมด"""
     return [staff.info() for staff in bibliohub.get_staff_list]
 
-# @app.get("/checkout",tags=["Checkout"])
 @mcp.tool
-def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocode:str):
+def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocode:str,current_time:str):
     """
         จ่ายเงิน หลังจากทำรายการอื่นๆ มาแล้ว
+        current_time รูปแบบคือ hh:mm เช่น 08:00 ปกติจะเป็นเวลาปัจจุบันในประเทศไทย
     """
-    transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method,promocode)
+    current_time = datetime.strptime(current_time, "%H:%M").time()
+    transaction = bibliohub.checkout(bibliohub.get_user_from_phone_number(phonenumber),bibliohub.get_staff_by_no_staff(no_staff),payment_method,promocode,current_time)
 
     if isinstance(transaction,list):
         return transaction
@@ -267,7 +263,6 @@ def checkout(phonenumber:str,no_staff:str,payment_method:PaymentOptions,promocod
         }
     }
 
-# @app.get("/get_transaction",tags=["Main"])
 @mcp.tool
 def get_transaction(phonenumber:str):
     """
@@ -322,13 +317,13 @@ def get_manager_report(no_staff: str):
     }
 
 @mcp.tool
-def return_book(book_id:list[str]):
+def return_book(book_id:list[str],current_datetime: str):
     """
-        สำหรับให้ลูกค้าคืนหนังสือ
+        สำหรับให้ลูกค้าคืนหนังสือ ต้องการ book_id และ current_datetime ตามเวลาที่กำหนด  (รูปแบบ: dd/mm/yyyy HH:MM เช่น 10/03/2026 14:56)
     """
-    return bibliohub.return_book(book_id)
+    dt_obj = datetime.strptime(current_datetime, "%d/%m/%Y %H:%M") if current_datetime else datetime.now()    
+    return bibliohub.return_book(book_id,dt_obj)
 
-# @app.get("/process_book_return",tags=["For Staff"])
 @mcp.tool
 def process_return_book(no_staff : str,book_id : list[str]):
     """
@@ -336,13 +331,12 @@ def process_return_book(no_staff : str,book_id : list[str]):
     """
     return bibliohub.process_return_book(no_staff,book_id)
 
-# @app.get("/system/check_upcoming_deadlines", tags=["Notification Scheduler"])
 @mcp.tool
 def check_upcoming_deadlines(
     current_datetime: str):
 
     """
-        แสดงผลการแจ้งเตือนทั้งหมด ตามเวลาที่กำหนด  (รูปแบบ: dd/mm/yyyy HH:MM เช่น 10/03/2026 14:56)
+        แสดงผลการแจ้งเตือนทั้งหมด ตามเวลาที่กำหนด  (รูปแบบ: dd/mm/yyyy HH:MM เช่น 10/03/2026 14:56) ปกติจะเป็นวันเวลาปัจจุบันในประเทศไทย
     """
 
     try:
@@ -369,5 +363,4 @@ def check_upcoming_deadlines(
         }
 
 if __name__ == "__main__":
-    # uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info",reload=True)
     mcp.run()

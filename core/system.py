@@ -209,7 +209,7 @@ class System:
                 
         raise ValueError("ไม่พบพื้นที่ที่ค้นหา")
 
-    def select(self,phonenumber : str,item_id : list[str],num_days : int = 1) -> dict | str:
+    def select(self,phonenumber : str,item_id : list[str],num_days : int,current_time) -> dict | str:
         customer = self.get_user_from_phone_number(phonenumber)
         selectitem_list = []
 
@@ -248,8 +248,6 @@ class System:
                 if not target_time_slot or target_time_slot.is_available != ItemStatus.Available:
                     raise ValueError(f"สล็อต {time_slot_id} ถูกจองไปแล้ว หรือไม่มีในระบบ (กรุณาทำรายการใหม่)")
                 
-                # current_time = datetime.now().time()
-                current_time = datetime.strptime("08:00", "%H:%M").time()
                 slot_start_time = datetime.strptime(target_time_slot.start_time, "%H:%M").time()
                 
                 if slot_start_time <= current_time:
@@ -318,15 +316,15 @@ class System:
             "Customer Selected List" : respond
         }
      
-    def checkout(self,customer:Customer,staff:Staff,payment_method : PaymentOptions, promocode):
+    def checkout(self,customer:Customer,staff:Staff,payment_method : PaymentOptions, promocode,current_time):
         if not isinstance(customer,Customer):
             return "Not a customer"
         
-        if len(customer.get_selected_list) == 0:
+        if len(customer.get_selected_list) == 0 and customer.penalty_fee == 0:
             raise ValueError("No Order")
 
         transaction = Transaction(customer,staff,payment_method,datetime.now(),datetime.now())
-        transaction.make_order(customer)
+        transaction.make_order(customer,current_time)
 
         transaction.add_audit_log(f"Transaction requested : {datetime.now().strftime('%d/%m/%Y, %H:%M:%S')}") #need implement : เพิ่มรูปแบบของ audit log
 
@@ -444,15 +442,7 @@ class System:
 
     def remove_area(self,area):
         if isinstance(area,Area):
-            self.__area.remove(area) 
-    
-    def add_strike(self,customer):
-        if isinstance(customer,Customer):
-            customer.add_stike()
-
-    def reduce_strike(self,customer):
-        if isinstance(customer,Customer):
-            customer.reduce_strike()
+            self.__area.remove(area)
 
     def notify_user(self,customer,message):
         if isinstance(customer,Customer):
@@ -460,8 +450,9 @@ class System:
                 notification = Notification(customer,message)
                 customer.add_notify(notification)
                 self.__notification_list.append(notification)
+                return notification
 
-    def return_book(self,book_id : list[str]):
+    def return_book(self,book_id : list[str],dt_obj : datetime):
 
         result = []
         for id in book_id:
@@ -485,6 +476,9 @@ class System:
             self.__book_returned_list.append(book)
 
             book.customer.book_rented -= 1
+            if dt_obj > book.end_date:
+                book.customer.penalty_fee = (dt_obj - book.end_date).days * 10
+                book.customer.strike -= 1
 
         return {
             "Book Returned" : result
@@ -522,7 +516,7 @@ class System:
             
 
 
-    def upgrade_booking_area(self, phonenumber: str, old_area_id: str, new_area_id: str, slot_ids: list[str]):
+    def upgrade_booking_area(self, phonenumber: str, old_area_id: str, new_area_id: str, slot_ids: list[str],current_time):
         
         #หา Customer
         customer = self.get_user_from_phone_number(phonenumber)
@@ -551,8 +545,6 @@ class System:
         if len(new_slots) != len(slot_ids):
             raise ValueError("สล็อตเวลาบางอันไม่ถูกต้อง")
 
-        # current_time = datetime.now().time()
-        current_time = datetime.strptime("08:00", "%H:%M").time()
         for slot in new_slots:
             if slot.is_available != ItemStatus.Available:
                 raise ValueError(f"สล็อต {slot.slot_id} ไม่ว่างแล้ว")
@@ -573,7 +565,7 @@ class System:
 
         #สร้างใบอัปเกรด
         try:
-            upgrade_item = UpgradeArea(old_booking_obj, new_slots)
+            upgrade_item = UpgradeArea(old_booking_obj, new_slots,current_time)
         except ValueError as e:
             raise ValueError(str(e))
             
@@ -744,6 +736,5 @@ class System:
             for item in items:
                 pending_messages = self.should_notify(current_time, item, customer_obj.name)
                 for msg in pending_messages:
-                    self.notify_user(customer_obj, msg)
-                    report.append({"customer": customer_obj.name, "message": msg})
+                    report.append(self.notify_user(customer_obj, msg))
         return report 

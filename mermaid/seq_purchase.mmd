@@ -5,7 +5,6 @@ sequenceDiagram
     participant CS as Customer
     participant BS as BookStock
     participant BI as BookInfo
-    participant BK as Book
 
     Note over US, SYS: --- SELECT BOOK PHASE ---
     loop Select Book
@@ -35,28 +34,3 @@ sequenceDiagram
         SYS -->> US: return selected_list[]
         deactivate SYS
     end
-
-    Note over US, SYS: --- CHECKOUT PHASE ---
-    US ->> SYS: checkout_purchase(phonenumber, payment_method)
-    activate SYS
-    
-    loop check Book attribute selected_list in customer
-        alt Book in customer (Success Case)
-            loop check activity_type Book
-                alt activity_type is "Purchase"
-                    create participant PS as Purchase
-                    SYS ->> PS: create_purchase(order)
-                    activate PS
-                    PS -->> SYS: return Purchase Object
-                    deactivate PS
-                    SYS ->> SYS: checkout(customer, Staff(), [order], payment_method) 
-                    SYS -->> US: return Completed. Total payment made net_amount bath
-                else
-                    SYS -->> US: return activity_type is "Rent"
-                end
-            end
-        else not Book in customer (Failure Case)
-            SYS -->> US: return Don't has Purchase
-        end
-    end
-    deactivate SYS

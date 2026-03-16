@@ -1,5 +1,8 @@
 sequenceDiagram
     %% Search Book by Series
+	actor Customer
+	participant SYS as System
+	participant BS as BookStock
 
     Note over Customer: search bookinfo by series
     Customer ->>+ SYS: search_book_by_series(book_series)

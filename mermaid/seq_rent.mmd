@@ -6,9 +6,7 @@ sequenceDiagram
     participant BS as BookStock
     participant BI as BookInfo
     participant BK as Book
-
-    SYS -->>- Customer: return book_forsale_list, book_rent_list [list]
-
+    
     %% Select Book
 
     Customer ->>+ SYS: select_book(phonenumber,item_id,num_days)
