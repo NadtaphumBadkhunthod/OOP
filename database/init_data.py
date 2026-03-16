@@ -34,7 +34,6 @@ def mock_data():
     bibliohub.add_area(AreaType.meeting_room,150.0,["Projector", "Whiteboard"], 4)
     bibliohub.add_area(AreaType.quiet_area, 50.0, ["Desk Lamp", "Power Outlet"], 1)
     bibliohub.register(bibliohub.add_customer("ปลื้ม", "เรียนไหม", "0812345678", "pluem@gmail.com"),BirthMonth.May)
-    bibliohub.add_staff(bibliohub.add_customer("Pluemepime","PimePluem","0000000000","68010366@kmitl.ac.th"),BirthMonth.Jan)
     bibliohub.add_customer("Sixsax","Saxsix","1111111111","68010366@kmitl.ac.th")
 
     # Create_Book
@@ -51,26 +50,5 @@ def mock_data():
     # Add Manager
     manager_obj = Manager(bibliohub.add_customer("Sax_Manager", "Pongsathorn", "0999999999", "sax_boss@kmitl.ac.th"), BirthMonth.Jan, "BR-01")
     bibliohub.get_staff_list.append(manager_obj) 
-
-    # cust = bibliohub.get_user_from_phone_number("0812345678")
-    # stf = bibliohub.get_staff_by_no_staff("STF-0")
-
-    # if cust and stf:
-    #     bibliohub.select("0812345678", ["BK-Rent-How_to_learn_OOP-How_to_learn_OOP-Sixsax"])
-    #     bibliohub.checkout(cust, stf, PaymentOptions.cash, "NONE")
-
-    #     bibliohub.select("0812345678", ["BK-Purchase-How_to_learn_OOP-How_to_learn_OOP_2-Sixsax"])
-    #     bibliohub.checkout(cust, stf, PaymentOptions.qr_code, "NONE")
-
-        # utilization_percent = slot ที่ถูกจอง / slot ที่มีอยู่ * 100
-        # if bibliohub.list_area:
-        #     first_area = bibliohub.list_area[0]
-        #     if first_area.area__slots:
-                # bibliohub.select("0812345678", [first_area.area__slots[0].slot_id])
-                # bibliohub.checkout(cust, stf, PaymentOptions.cash, "NONE")
-
-    # gold_member = bibliohub.register(bibliohub.add_customer("สมชาย", "สายเปย์", "0844444444", "gold@gmail.com"), BirthMonth.Aug)
-    # if isinstance(gold_member, Member):
-    #     for _ in range(35): gold_member.add_point()
 
     return bibliohub

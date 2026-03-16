@@ -398,11 +398,18 @@ class System:
         return self.get_all_book
 
     def add_staff(self,customer,birth_month):
+        if not isinstance(customer,Customer):
+            raise ValueError("Not a customer")
+
         if isinstance(customer,Staff):
             raise ValueError("Customer is already a staff")
         
         if not isinstance(birth_month,BirthMonth):
             raise ValueError("BirthMonth Error")
+        
+        for staff in self.__staff_list:
+            if staff.name == customer.name:
+                raise ValueError("Duplicate Staff")
         
         self.__staff_list.append(Staff(customer,birth_month))
         return "Add Staff Successful"

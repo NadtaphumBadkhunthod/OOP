@@ -34,8 +34,8 @@
 ```text
 📦 BiblioHub-Management-System
  ┣ 📂 models           # เก็บ Class ต่างๆ (Customer, Book, Area, Transaction)
- ┣ 📂 services         # เก็บ MCP Tools และ API Endpoints
- ┣ 📜 system.py        # Controller Class (BiblioHubSystem) ควบคุมลอจิกหลัก
+ ┣ 📂 core             # Controller Class (BiblioHubSystem) ควบคุมลอจิกหลัก
+ ┣ 📂 database         # เก็บการสร้าง Data พื้นฐานสำหรับโปรแกรม
  ┣ 📜 main.py          # ไฟล์หลักสำหรับรันโปรแกรม
  ┣ 📜 requirements.txt # รายชื่อไลบรารีที่ต้องใช้
  ┗ 📜 README.md        # เอกสารแนะนำโปรเจกต์
@@ -45,6 +45,7 @@
 
 ### Prerequisites (สิ่งที่ต้องมี)
 - Python 3.10 ขึ้นไป
-- พิมพ์คำสั่งติดตั้งไลบรารีที่จำเป็น (หากมี)
-```bash
+- Claude Desktop
+
+## ติดตั้ง Library ที่จำเป็น
 pip install -r requirements.txt
