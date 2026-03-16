@@ -18,10 +18,11 @@ rectangle "BiblioHub Management System" {
     ' Resource Operations
     usecase "Booking Area" as UCS3
     usecase "Upgrade Area" as UC4
-    usecase "Rent Or Purchase Books" as RPB1
+    usecase "Rent Books" as RB1
+    usecase "Purchase Books" as PB1
     usecase "Search Book" as SB1
     usecase "Search Area" as SS1
-    usecase "Return Book" as RB1
+    usecase "Return Book" as REB1
     usecase "Booking Book" as BB1
     usecase "Register" as RG1
     usecase "View Transaction" as VT1
@@ -44,28 +45,34 @@ rectangle "BiblioHub Management System" {
 
 
     ' Relationships
-    G --> SB1
-    G --> SS1
-    G --> RB1
+    G --> RB1 
+    G --> PB1 
     G --> RG1
-    G --> CheckoutCC1
     G --> UC4
     G --> CC1
     G --> VT1
+    G --> UCS3
     M --> BB1
     
     ' Extend & Include
+    SB1 <..  RB1 : <<include>>
+    SB1 <..  PB1 : <<include>>
+    CheckoutCC1 ..> UC6: <<include>>
+    CheckoutCC1 ..> BB1: <<extend>>
     RG1 ..> CC1 : <<include>>
     BB1 ..> SB1 : <<include>>
     UC6 ..> UC7 : <<include>>
     UC6 ..> UC8 : <<include>>
-    RPB1 <.. UC6 : <<include>>
-    UCS3 <.. UC6 : <<include>>
+    REB1 ..> RB1 : <<include>>
+    RB1 <.. CheckoutCC1: <<extend>>
+    PB1 <.. CheckoutCC1: <<extend>>
+    UCS3 <.. CheckoutCC1: <<extend>>
     UCS3 <.. Notification : <<include>>
-    RPB1 <.. Notification : <<include>>
-    RB1 <.. UC6 : <<extend>>
-    SB1 <..  RPB1 : <<include>>
+    RB1 <.. Notification : <<include>>
+    REB1 <.. CheckoutCC1: <<extend>>
     SS1 <.. UCS3 : <<include>>
+    CheckoutCC1 ..> UC4: <<extend>>
+    UC4 ..> UCS3: <<include>>
 
     
     S --> UC9
